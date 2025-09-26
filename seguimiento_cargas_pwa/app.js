@@ -777,15 +777,18 @@
     if (label == null) {
       return '';
     }
-    const text = String(label);
+    const text = String(label).trim();
     if (!text) {
       return '';
     }
+    const upper = text.toUpperCase();
     const lower = text.toLowerCase();
-    if (!lower) {
-      return '';
+    const hasLetters = upper !== lower;
+    const isAllCaps = hasLetters && text === upper;
+    if (isAllCaps) {
+      return text;
     }
-    return lower.charAt(0).toUpperCase() + lower.slice(1);
+    return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
   function getStoredValue(key) {
@@ -3657,7 +3660,11 @@
     window.addEventListener('DOMContentLoaded', initApp);
   }
 
-  const exportsObject = { fmtDate: fmtDate, DEFAULT_LOCALE: DEFAULT_LOCALE };
+  const exportsObject = {
+    fmtDate: fmtDate,
+    DEFAULT_LOCALE: DEFAULT_LOCALE,
+    formatHeaderLabel: formatHeaderLabel
+  };
 
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = exportsObject;
