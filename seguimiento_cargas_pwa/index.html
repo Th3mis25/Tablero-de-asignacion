@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Seguimiento de cargas</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="sheet-app" data-app>
+    <header class="sheet-app__toolbar">
+      <img
+        src="./assets/logo.png"
+        alt="Logo de la empresa"
+        class="sheet-app__logo"
+      />
+      <div class="sheet-app__title-group">
+        <h1>Seguimiento de cargas</h1>
+      </div>
+      <div class="sheet-app__controls">
+        <div class="theme-toggle" data-theme-toggle>
+          <input
+            type="checkbox"
+            class="theme-toggle__input"
+            id="themeToggle"
+            data-theme-switch
+            aria-label="Cambiar entre tema claro y oscuro"
+          />
+          <label class="theme-toggle__label" for="themeToggle">
+            <span class="theme-toggle__icon" aria-hidden="true">☀</span>
+            <span class="theme-toggle__icon" aria-hidden="true">🌙</span>
+            <span class="theme-toggle__thumb" aria-hidden="true"></span>
+          </label>
+          <span class="theme-toggle__text" data-theme-label>Tema claro</span>
+        </div>
+        <button type="button" class="button button--secondary is-hidden" data-action="change-token">Cambiar token</button>
+        <button type="button" class="button button--secondary" data-action="refresh">Actualizar</button>
+        <button type="button" class="button button--primary" data-action="new-record">Nuevo registro</button>
+        <button type="button" class="button button--secondary" data-action="logout">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <div class="sheet-grid">
+      <div class="sheet-grid__views" data-view-menu role="toolbar" aria-label="Vistas de la tabla"></div>
+      <div class="sheet-grid__filters" data-filter-panel>
+        <div class="filter-card filter-card--search">
+          <label class="sheet-grid__filter-field" for="filterSearch">
+            <span class="sheet-grid__filter-label">Buscar:</span>
+            <input
+              id="filterSearch"
+              type="search"
+              name="filterSearch"
+              placeholder="Trip, Caja, Referencia o Cliente"
+              autocomplete="off"
+              spellcheck="false"
+              data-filter-search
+            />
+          </label>
+        </div>
+        <div class="filter-card filter-card--date">
+          <div class="sheet-grid__filter-field sheet-grid__filter-field--date" data-date-filter>
+            <span class="sheet-grid__filter-label">Fecha:</span>
+            <div class="date-filter">
+              <button type="button" class="date-filter__nav" data-action="date-prev" aria-label="Rango anterior">
+                <span aria-hidden="true">&#x2039;</span>
+              </button>
+              <button
+                type="button"
+                class="date-filter__toggle"
+                data-action="date-toggle"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+              >
+                <svg class="date-filter__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M7 2a1 1 0 0 0-1 1v1H5a3 3 0 0 0-3 3v11a3 3 0 0 0 3 3h14a3 3 0 0 0 3-3V7a3 3 0 0 0-3-3h-1V3a1 1 0 1 0-2 0v1H8V3a1 1 0 0 0-1-1Zm12 6H5v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1Z"
+                    fill="currentColor"
+                  ></path>
+                </svg>
+                <span class="date-filter__label" data-date-label>Hoy</span>
+              </button>
+              <button type="button" class="date-filter__nav" data-action="date-next" aria-label="Rango siguiente">
+                <span aria-hidden="true">&#x203A;</span>
+              </button>
+            </div>
+            <div class="date-filter__popover" data-date-popover hidden>
+              <div class="date-filter__group">
+                <label>
+                  <span>Desde</span>
+                  <input type="date" data-date-start />
+                </label>
+                <label>
+                  <span>Hasta</span>
+                  <input type="date" data-date-end />
+                </label>
+              </div>
+              <div class="date-filter__actions">
+                <button type="button" class="date-filter__clear" data-action="date-clear">Limpiar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="filter-card filter-card--status">
+          <div class="sheet-grid__filter-field sheet-grid__filter-field--status" data-status-filter>
+            <span class="sheet-grid__filter-label">Estatus:</span>
+            <div class="status-filter">
+              <button
+                type="button"
+                class="status-filter__toggle"
+                data-action="status-toggle"
+                aria-haspopup="listbox"
+                aria-expanded="false"
+              >
+                <span class="status-filter__label" data-status-label>Todos</span>
+                <svg class="status-filter__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M7 10l5 5 5-5H7z" fill="currentColor"></path>
+                </svg>
+              </button>
+              <div class="status-filter__popover" data-status-popover hidden>
+                <ul class="status-filter__list" data-status-list role="listbox" aria-label="Opciones de estatus"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="sheet-grid__viewport" role="region" aria-live="polite" aria-label="Tabla de seguimiento">
+        <table class="sheet-table">
+          <thead data-table-head></thead>
+          <tbody data-table-body></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer class="sheet-app__footer">
+      <span class="sheet-app__footer-item" data-last-updated>Última actualización: —</span>
+      <span class="sheet-app__footer-item sheet-app__footer-item--status">
+        <span class="sheet-status" data-status aria-live="polite" hidden></span>
+      </span>
+      <span class="sheet-app__footer-item" data-current-user></span>
+    </footer>
+  </div>
+
+  <div class="modal-backdrop hidden" data-backdrop></div>
+
+  <section class="edit-modal hidden" data-edit-modal aria-modal="true" role="dialog" aria-labelledby="editTitle">
+    <form class="edit-modal__form" data-edit-form novalidate>
+      <h2 id="editTitle" data-edit-title>Editar registro</h2>
+      <p class="edit-modal__hint" data-edit-hint>Actualiza la información del viaje y guarda los cambios.</p>
+      <div class="edit-modal__grid">
+        <div class="form-field">
+          <label for="editTrip">Trip</label>
+          <input id="editTrip" name="trip" type="number" inputmode="numeric" min="225000" step="1" required />
+        </div>
+        <div class="form-field">
+          <label for="editEjecutivo">Ejecutivo</label>
+          <input id="editEjecutivo" name="ejecutivo" type="text" required />
+        </div>
+        <div class="form-field">
+          <label for="editCaja">Caja</label>
+          <input id="editCaja" name="caja" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editReferencia">Referencia</label>
+          <input id="editReferencia" name="referencia" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editCliente">Cliente</label>
+          <input id="editCliente" name="cliente" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editDestino">Destino</label>
+          <input id="editDestino" name="destino" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editEstatus">Estatus</label>
+          <input id="editEstatus" name="estatus" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editSegmento">Segmento</label>
+          <input id="editSegmento" name="segmento" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editTrmx">TR-MX</label>
+          <input id="editTrmx" name="trmx" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editTrusa">TR-USA</label>
+          <input id="editTrusa" name="trusa" type="text" />
+        </div>
+        <div class="form-field">
+          <label for="editCitaCarga">Cita carga</label>
+          <input id="editCitaCarga" name="citaCarga" type="datetime-local" />
+        </div>
+        <div class="form-field">
+          <label for="editLlegadaCarga">Llegada carga</label>
+          <input id="editLlegadaCarga" name="llegadaCarga" type="datetime-local" />
+        </div>
+        <div class="form-field">
+          <label for="editCitaEntrega">Cita entrega</label>
+          <input id="editCitaEntrega" name="citaEntrega" type="datetime-local" />
+        </div>
+        <div class="form-field">
+          <label for="editLlegadaEntrega">Llegada entrega</label>
+          <input id="editLlegadaEntrega" name="llegadaEntrega" type="datetime-local" />
+        </div>
+        <div class="form-field form-field--full">
+          <label for="editComentarios">Comentarios</label>
+          <textarea id="editComentarios" name="comentarios" rows="3"></textarea>
+        </div>
+        <div class="form-field form-field--full">
+          <label for="editDocs">Docs</label>
+          <input id="editDocs" name="docs" type="text" />
+        </div>
+        <div class="form-field form-field--full">
+          <label for="editTracking">Tracking</label>
+          <input id="editTracking" name="tracking" type="text" />
+        </div>
+      </div>
+      <p class="edit-modal__error" data-edit-error aria-live="assertive"></p>
+      <div class="edit-modal__actions">
+        <button type="button" class="button button--secondary" data-action="cancel-edit">Cancelar</button>
+        <button type="submit" class="button button--primary" data-edit-submit>Guardar cambios</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="login-modal hidden" data-login-modal aria-modal="true" role="dialog" aria-labelledby="loginTitle">
+    <form class="login-modal__form" data-login-form novalidate>
+      <h2 id="loginTitle">Iniciar sesión</h2>
+      <p class="login-modal__hint">Introduce tus credenciales para mostrar los datos de la hoja.</p>
+      <div class="form-field">
+        <label for="username">Usuario</label>
+        <input id="username" name="username" type="text" autocomplete="username" required />
+      </div>
+      <div class="form-field">
+        <label for="password">Contraseña</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+      </div>
+      <div class="form-field" data-token-field>
+        <label for="token">Token de API</label>
+        <input id="token" name="token" type="text" autocomplete="off" />
+        <p class="form-field__hint">El token se define en el Apps Script o en secure-config.json.</p>
+      </div>
+      <p class="login-modal__error" data-login-error aria-live="assertive"></p>
+      <div class="login-modal__actions">
+        <button type="submit" class="button button--primary">Entrar</button>
+      </div>
+    </form>
+  </section>
+
+  <noscript>
+    <p class="noscript">Activa JavaScript para visualizar la tabla conectada con la hoja.</p>
+  </noscript>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
