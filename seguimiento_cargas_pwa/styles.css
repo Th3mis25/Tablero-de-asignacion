@@ -62,6 +62,20 @@
   --status-cancelled-text: #8a1312;
   --status-delayed-bg: rgba(240, 124, 0, 0.18);
   --status-delayed-text: #7a2d00;
+  --status-live-bg: rgba(26, 115, 232, 0.16);
+  --status-live-text: #0b3d59;
+  --status-loading-bg: rgba(251, 188, 5, 0.24);
+  --status-loading-text: #7a5a00;
+  --status-yard-primary-bg: rgba(67, 97, 238, 0.18);
+  --status-yard-primary-text: #102250;
+  --status-yard-nuevo-laredo-bg: rgba(26, 188, 156, 0.2);
+  --status-yard-nuevo-laredo-text: #0b4f44;
+  --status-in-transit-mx-bg: var(--status-delayed-bg);
+  --status-in-transit-mx-text: var(--status-delayed-text);
+  --status-in-transit-usa-bg: rgba(26, 115, 232, 0.2);
+  --status-in-transit-usa-text: #0b3d59;
+  --status-at-destination-bg: var(--status-delivered-bg);
+  --status-at-destination-text: var(--status-delivered-text);
   --button-background: #ffffff;
   --button-background-hover: rgba(26, 115, 232, 0.08);
   --button-primary-text: #ffffff;
@@ -120,6 +134,20 @@
   --status-cancelled-text: #ffd9d4;
   --status-delayed-bg: rgba(255, 165, 95, 0.32);
   --status-delayed-text: #ffe3c9;
+  --status-live-bg: rgba(98, 176, 255, 0.32);
+  --status-live-text: #dceeff;
+  --status-loading-bg: rgba(255, 208, 102, 0.32);
+  --status-loading-text: #ffecb5;
+  --status-yard-primary-bg: rgba(133, 166, 255, 0.34);
+  --status-yard-primary-text: #e4e9ff;
+  --status-yard-nuevo-laredo-bg: rgba(112, 224, 198, 0.32);
+  --status-yard-nuevo-laredo-text: #d7fff1;
+  --status-in-transit-mx-bg: var(--status-delayed-bg);
+  --status-in-transit-mx-text: var(--status-delayed-text);
+  --status-in-transit-usa-bg: rgba(98, 176, 255, 0.34);
+  --status-in-transit-usa-text: #dceeff;
+  --status-at-destination-bg: var(--status-delivered-bg);
+  --status-at-destination-text: var(--status-delivered-text);
   --button-background: #172a47;
   --button-background-hover: rgba(98, 176, 255, 0.18);
   --button-primary-text: #f2f7ff;
@@ -944,46 +972,46 @@ body {
 .status-badge--live,
 .status-badge--drop,
 .status-badge--live-drop {
-  background-color: #5dade2;
-  color: #0b3d59;
+  background: var(--status-live-bg);
+  color: var(--status-live-text);
 }
 
 .status-badge--loading {
-  background-color: #f4d03f;
-  color: #7a5a00;
+  background: var(--status-loading-bg);
+  color: var(--status-loading-text);
 }
 
 .status-badge--qro-yard,
 .status-badge--mty-yard,
 .status-badge--mieleras-yard {
-  background-color: #9b59b6;
-  color: #ffffff;
+  background: var(--status-yard-primary-bg);
+  color: var(--status-yard-primary-text);
 }
 
 .status-badge--nuevo-laredo-yard {
-  background-color: #1abc9c;
-  color: #0b4f44;
+  background: var(--status-yard-nuevo-laredo-bg);
+  color: var(--status-yard-nuevo-laredo-text);
 }
 
 .status-badge--in-transit-mx {
-  background-color: #e67e22;
-  color: #ffffff;
+  background: var(--status-in-transit-mx-bg);
+  color: var(--status-in-transit-mx-text);
 }
 
 .status-badge--in-transit-usa {
-  background-color: #3498db;
-  color: #ffffff;
+  background: var(--status-in-transit-usa-bg);
+  color: var(--status-in-transit-usa-text);
 }
 
 .status-badge--cancelled {
-  background-color: #e74c3c;
-  color: #ffffff;
+  background: var(--status-cancelled-bg);
+  color: var(--status-cancelled-text);
 }
 
 .status-badge--at-destination,
 .status-badge--delivered {
-  background-color: #2ecc71;
-  color: #145a32;
+  background: var(--status-at-destination-bg);
+  color: var(--status-at-destination-text);
 }
 
 .status-badge--en-transito {
