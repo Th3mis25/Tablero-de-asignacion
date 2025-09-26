@@ -2653,6 +2653,7 @@
         return;
       }
       state.currentViewId = nextId;
+      resetFilters();
       renderViewMenu();
       renderTable();
       renderDateFilter();
