@@ -718,7 +718,8 @@
       label: 'Todas las cargas',
       filter: function () {
         return true;
-      }
+      },
+      dateFilterEnabled: false
     },
     {
       id: 'daily-loads',
@@ -1111,7 +1112,7 @@
       theme: initialTheme,
       filters: {
         searchText: '',
-        dateRange: createTodayRange(),
+        dateRange: null,
         status: ''
       },
       availableStatuses: [],
@@ -2372,6 +2373,11 @@
     }
 
 
+    function isDateFilterEnabledForCurrentView() {
+      const activeView = getActiveView();
+      return Boolean(activeView && activeView.dateFilterEnabled);
+    }
+
     function renderDateFilter() {
       const normalized = normalizeDateRange(state.filters.dateRange || {});
       state.filters.dateRange = normalized;
@@ -2381,7 +2387,7 @@
         refs.dateLabel.textContent = formatDateRangeLabel(normalized, state.locale);
       }
 
-      const shouldShowDateFilter = state.currentViewId === 'all';
+      const shouldShowDateFilter = isDateFilterEnabledForCurrentView();
       const filterCard = refs.dateFilter && typeof refs.dateFilter.closest === 'function'
         ? refs.dateFilter.closest('.filter-card')
         : null;
@@ -2584,7 +2590,7 @@
 
     function resetFilters() {
       state.filters.searchText = '';
-      state.filters.dateRange = createTodayRange();
+      state.filters.dateRange = { start: null, end: null };
       state.filters.status = '';
       state.isDatePopoverOpen = false;
       state.isStatusPopoverOpen = false;
@@ -2834,7 +2840,7 @@
       const endTime = isValidDate(normalizedDateRange.end) ? normalizedDateRange.end.getTime() : null;
       const citaCargaIndex = typeof columnMap.citaCarga === 'number' && columnMap.citaCarga >= 0 ? columnMap.citaCarga : null;
       const dateFilterIndices = citaCargaIndex != null ? [citaCargaIndex] : [];
-      const shouldApplyDateFilter = state.currentViewId === 'all';
+      const shouldApplyDateFilter = isDateFilterEnabledForCurrentView();
       const hasDateRange = shouldApplyDateFilter && (startTime != null || endTime != null) && dateFilterIndices.length > 0;
 
       if (hasDateRange) {
