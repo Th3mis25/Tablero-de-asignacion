@@ -106,20 +106,20 @@
   --accent-border-weak: rgba(98, 176, 255, 0.5);
   --accent-border-strong: rgba(98, 176, 255, 0.75);
   --accent-shadow: rgba(45, 110, 194, 0.45);
-  --danger: #ff9f95;
-  --success: #7dd5a2;
-  --status-default-bg: rgba(124, 154, 197, 0.22);
-  --status-default-text: #e0ebff;
+  --danger: #ff6b60;
+  --success: #58e0a6;
+  --status-default-bg: rgba(122, 153, 197, 0.28);
+  --status-default-text: #d7e7ff;
   --status-in-transit-bg: rgba(98, 176, 255, 0.3);
-  --status-in-transit-text: #ecf6ff;
-  --status-delivered-bg: rgba(125, 213, 162, 0.32);
-  --status-delivered-text: #e7ffee;
-  --status-pending-bg: rgba(255, 204, 0, 0.28);
-  --status-pending-text: #fff1b3;
-  --status-cancelled-bg: rgba(255, 159, 149, 0.3);
-  --status-cancelled-text: #ffe1dd;
-  --status-delayed-bg: rgba(255, 183, 77, 0.3);
-  --status-delayed-text: #ffe8c5;
+  --status-in-transit-text: #d6eaff;
+  --status-delivered-bg: rgba(93, 211, 160, 0.3);
+  --status-delivered-text: #ccfbe3;
+  --status-pending-bg: rgba(255, 190, 70, 0.32);
+  --status-pending-text: #ffe7b0;
+  --status-cancelled-bg: rgba(255, 130, 116, 0.32);
+  --status-cancelled-text: #ffd9d4;
+  --status-delayed-bg: rgba(255, 165, 95, 0.32);
+  --status-delayed-text: #ffe3c9;
   --button-background: #172a47;
   --button-background-hover: rgba(98, 176, 255, 0.18);
   --button-primary-text: #f2f7ff;
@@ -135,9 +135,9 @@
   --modal-shadow: 0 var(--size-18) var(--size-48) rgba(7, 15, 31, 0.78);
   --backdrop-color: rgba(7, 15, 31, 0.7);
   --table-empty-color: rgba(197, 218, 245, 0.7);
-  --warning-bg: rgba(255, 204, 0, 0.2);
-  --warning-text: #ffe08a;
-  --warning-border: rgba(255, 204, 0, 0.45);
+  --warning-bg: rgba(255, 190, 70, 0.24);
+  --warning-text: #ffdd94;
+  --warning-border: rgba(255, 190, 70, 0.58);
 }
 
 :root[data-theme='dark'] .sheet-table tbody tr.is-cita-carga-vencida td {
