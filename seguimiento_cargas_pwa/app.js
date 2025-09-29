@@ -719,37 +719,43 @@
       filter: function () {
         return true;
       },
-      dateFilterEnabled: false
+      dateFilterEnabled: true
     },
     {
       id: 'daily-loads',
       label: 'Cargas diarias',
-      filter: matchesDailyLoadsView
+      filter: matchesDailyLoadsView,
+      dateFilterEnabled: true
     },
     {
       id: 'cruces',
       label: 'Cruces',
-      filter: matchesCrucesView
+      filter: matchesCrucesView,
+      dateFilterEnabled: true
     },
     {
       id: 'today-deliveries',
       label: 'Entregas hoy',
-      filter: matchesTodayDeliveriesView
+      filter: matchesTodayDeliveriesView,
+      dateFilterEnabled: true
     },
     {
       id: 'confirmed-appointments',
       label: 'Citas confirmadas',
-      filter: matchesConfirmedAppointmentsView
+      filter: matchesConfirmedAppointmentsView,
+      dateFilterEnabled: true
     },
     {
       id: 'inventario-nlar',
       label: 'Inventario Nlar',
-      filter: matchesInventarioNlarView
+      filter: matchesInventarioNlarView,
+      dateFilterEnabled: true
     },
     {
       id: 'weekly-program',
       label: 'Programa semanal',
-      filter: matchesWeeklyProgramView
+      filter: matchesWeeklyProgramView,
+      dateFilterEnabled: true
     }
   ];
 
@@ -2454,7 +2460,7 @@
     function renderDateFilter() {
       const normalized = normalizeDateRange(state.filters.dateRange || {});
       state.filters.dateRange = normalized;
-      const hasRange = isValidDate(normalized.start) || isValidDate(normalized.end);
+      const hasRange = isValidDate(normalized.start) && isValidDate(normalized.end);
 
       if (refs.dateLabel) {
         refs.dateLabel.textContent = formatDateRangeLabel(normalized, state.locale);
@@ -2564,7 +2570,7 @@
 
     function shiftCurrentDateRange(days) {
       const normalized = normalizeDateRange(state.filters.dateRange || {});
-      const hasRange = isValidDate(normalized.start) || isValidDate(normalized.end);
+      const hasRange = isValidDate(normalized.start) && isValidDate(normalized.end);
       const baseRange = hasRange ? normalized : createTodayRange();
       const delta = Number(days) * MS_PER_DAY;
       const nextStart = isValidDate(baseRange.start) ? new Date(baseRange.start.getTime() + delta) : null;
@@ -2918,7 +2924,8 @@
       const citaCargaIndex = typeof columnMap.citaCarga === 'number' && columnMap.citaCarga >= 0 ? columnMap.citaCarga : null;
       const dateFilterIndices = citaCargaIndex != null ? [citaCargaIndex] : [];
       const shouldApplyDateFilter = isDateFilterEnabledForCurrentView();
-      const hasDateRange = shouldApplyDateFilter && (startTime != null || endTime != null) && dateFilterIndices.length > 0;
+      const hasDateRange =
+        shouldApplyDateFilter && startTime != null && endTime != null && dateFilterIndices.length > 0;
 
       if (hasDateRange) {
         rowsToRender = rowsToRender.filter(function (entry) {
