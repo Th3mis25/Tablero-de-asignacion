@@ -193,6 +193,8 @@ function doPost(e) {
       }
       var tripIdx = headerMap['trip'];
       if (tripIdx == null) throw new Error('Trip column not found');
+      var ejecutivoIdx = headerMap['ejecutivo'];
+      if (ejecutivoIdx == null) throw new Error('Ejecutivo column not found');
       var existingTrips = {};
       for (var r = 1; r < data.length; r++) {
         var existingTripValue = data[r][tripIdx];
@@ -206,6 +208,7 @@ function doPost(e) {
       var duplicates = [];
       var duplicateMap = {};
       var values = [];
+      var invalidRows = [];
       for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
         var rowObj = rows[rowIndex];
         var arr = new Array(headers.length).fill('');
@@ -223,6 +226,25 @@ function doPost(e) {
         }
         var tripValue = arr[tripIdx];
         var tripKey = tripValue == null ? '' : String(tripValue).trim();
+        var ejecutivoValue = arr[ejecutivoIdx];
+        var ejecutivoKey = ejecutivoValue == null ? '' : String(ejecutivoValue).trim();
+        var rowIssues = [];
+        if (!tripKey) {
+          rowIssues.push('Trip vacío');
+        } else if (!/^\d+$/.test(tripKey)) {
+          rowIssues.push('Trip inválido');
+        } else if (Number(tripKey) < 225000) {
+          rowIssues.push('Trip menor a 225000');
+        }
+        if (!ejecutivoKey) {
+          rowIssues.push('Ejecutivo vacío');
+        }
+        if (rowIssues.length > 0) {
+          invalidRows.push('Fila ' + (rowIndex + 2) + ': ' + rowIssues.join(', ') + '.');
+          continue;
+        }
+        arr[tripIdx] = tripKey;
+        arr[ejecutivoIdx] = ejecutivoKey;
         if (tripKey && existingTrips[tripKey]) {
           if (!duplicateMap[tripKey]) {
             duplicates.push(tripKey);
@@ -238,7 +260,12 @@ function doPost(e) {
       if(values.length){
         sheet.getRange(sheet.getLastRow() + 1, 1, values.length, headers.length).setValues(values);
       }
-      return createJsonOutput({ success: true, inserted: values.length, duplicates: duplicates }, 200, origin);
+      return createJsonOutput({
+        success: true,
+        inserted: values.length,
+        duplicates: duplicates,
+        invalidRows: invalidRows
+      }, 200, origin);
     } else if (p.action === 'update') {
       var data = sheet.getDataRange().getValues();
       var headers = data[0];

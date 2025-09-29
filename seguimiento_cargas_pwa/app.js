@@ -2107,10 +2107,10 @@
         const rawRows = await readExcelFile(file);
         const preparation = prepareBulkRows(rawRows);
         const validRows = Array.isArray(preparation.rows) ? preparation.rows : [];
-        const issues = Array.isArray(preparation.issues) ? preparation.issues : [];
+        const preparationIssues = Array.isArray(preparation.issues) ? preparation.issues : [];
 
         if (validRows.length === 0) {
-          const issueSummary = summarizeIssues(issues, 3);
+          const issueSummary = summarizeIssues(preparationIssues, 3);
           const message = issueSummary
             ? `No se encontraron filas válidas. ${issueSummary}`
             : 'No se encontraron filas válidas en el archivo.';
@@ -2124,6 +2124,15 @@
         }
         const insertedCount = typeof response.inserted === 'number' ? response.inserted : validRows.length;
         const duplicates = Array.isArray(response.duplicates) ? response.duplicates : [];
+        const serverIssues = Array.isArray(response.invalidRows)
+          ? response.invalidRows.filter(function (message) {
+              return typeof message === 'string' && message.trim() !== '';
+            })
+          : [];
+        const combinedIssues = preparationIssues.slice();
+        if (serverIssues.length > 0) {
+          Array.prototype.push.apply(combinedIssues, serverIssues);
+        }
 
         if (insertedCount > 0) {
           await loadData();
@@ -2143,14 +2152,14 @@
           }
         }
 
-        if (issues.length > 0) {
-          const issuesLabel = issues.length === 1 ? 'fila' : 'filas';
-          const issuesSummary = summarizeIssues(issues, 3);
+        if (combinedIssues.length > 0) {
+          const issuesLabel = combinedIssues.length === 1 ? 'fila' : 'filas';
+          const issuesSummary = summarizeIssues(combinedIssues, 3);
           if (issuesSummary) {
             const trimmedSummary = issuesSummary.replace(/[.]+$/g, '');
-            parts.push(`Se ignoraron ${issues.length} ${issuesLabel} por errores: ${trimmedSummary}.`);
+            parts.push(`Se ignoraron ${combinedIssues.length} ${issuesLabel} por errores: ${trimmedSummary}.`);
           } else {
-            parts.push(`Se ignoraron ${issues.length} ${issuesLabel} por errores.`);
+            parts.push(`Se ignoraron ${combinedIssues.length} ${issuesLabel} por errores.`);
           }
         }
 
