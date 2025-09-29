@@ -1051,6 +1051,8 @@
       viewMenu: doc.querySelector('[data-view-menu]'),
       status: doc.querySelector('[data-status]'),
       refreshButton: doc.querySelector('[data-action="refresh"]'),
+      bulkUploadButton: doc.querySelector('[data-action="bulk-upload"]'),
+      bulkUploadInput: doc.querySelector('[data-bulk-upload-input]'),
       newRecordButton: doc.querySelector('[data-action="new-record"]'),
       logoutButton: doc.querySelector('[data-action="logout"]'),
       changeTokenButton: doc.querySelector('[data-action="change-token"]'),
@@ -2739,6 +2741,9 @@
       if (refs.refreshButton) {
         refs.refreshButton.disabled = Boolean(isLoading);
       }
+      if (refs.bulkUploadButton) {
+        refs.bulkUploadButton.disabled = Boolean(isLoading);
+      }
       if (isLoading) {
         appRoot.classList.add('is-loading');
       } else {
@@ -3603,6 +3608,12 @@
       refs.refreshButton.addEventListener('click', function () {
         loadData();
       });
+    }
+    if (refs.bulkUploadButton) {
+      refs.bulkUploadButton.addEventListener('click', handleBulkUploadClick);
+    }
+    if (refs.bulkUploadInput) {
+      refs.bulkUploadInput.addEventListener('change', handleBulkUploadInputChange);
     }
     if (refs.newRecordButton) {
       refs.newRecordButton.addEventListener('click', function () {
