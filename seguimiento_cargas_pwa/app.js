@@ -1034,6 +1034,68 @@
     }
   }
 
+  async function submitBulkAddRequest(apiBase, token, rows) {
+    if (!apiBase) {
+      throw new Error('Falta configurar la URL del Apps Script.');
+    }
+    if (!Array.isArray(rows)) {
+      throw new Error('Los datos de la carga masiva no tienen el formato esperado.');
+    }
+
+    let rowsPayload = '[]';
+    try {
+      rowsPayload = JSON.stringify(rows);
+    } catch (err) {
+      const friendly = new Error('No se pudieron preparar los datos de la carga masiva.');
+      friendly.cause = err instanceof Error ? err : undefined;
+      throw friendly;
+    }
+
+    const url = new URL(apiBase);
+    if (token) {
+      url.searchParams.set('token', token);
+    }
+
+    const params = new URLSearchParams();
+    params.append('action', 'bulkAdd');
+    params.append('rows', rowsPayload);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          Accept: 'application/json'
+        },
+        body: params.toString()
+      });
+
+      const result = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        const errorMessage = result && result.error ? result.error : `Error ${response.status}`;
+        const err = new Error(errorMessage);
+        err.status = response.status;
+        throw err;
+      }
+      if (result && result.error) {
+        const err = new Error(result.error);
+        err.status = response.status;
+        throw err;
+      }
+      return result;
+    } catch (err) {
+      if (err instanceof Error) {
+        if (!err.message || err.message === 'Failed to fetch') {
+          const friendly = new Error('No se pudo conectar con el Apps Script.');
+          friendly.cause = err;
+          throw friendly;
+        }
+        throw err;
+      }
+      throw new Error('No se pudo conectar con el Apps Script.');
+    }
+  }
+
   function initApp() {
     if (!global.document) {
       return;
