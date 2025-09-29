@@ -63,28 +63,31 @@ function callBulkAdd(rows) {
   return JSON.parse(response.content);
 }
 
-function buildRow(trip, ejecutivo) {
-  const row = new Array(headers.length).fill('');
-  row[0] = ejecutivo;
-  row[1] = trip;
-  return row;
-}
-
-storedValues = [headers.slice(), buildRow('225300', 'Ana')];
+storedValues = [headers.slice()];
 
 const result = callBulkAdd([
-  { 'Trip': '225301', 'Ejecutivo': 'Luis' },
-  { 'Trip': '225300', 'Ejecutivo': 'Carla' },
-  { 'Trip': '225301', 'Ejecutivo': 'Miguel' }
+  { 'Trip': '', 'Ejecutivo': 'Luis' },
+  { 'Trip': 'ABC', 'Ejecutivo': 'Ana' },
+  { 'Trip': '224999', 'Ejecutivo': 'Eva' },
+  { 'Trip': '225123', 'Ejecutivo': '' },
+  { 'Trip': '225124', 'Ejecutivo': 'Zoe' }
 ]);
 
-assert.strictEqual(result.success, true, 'bulkAdd should succeed');
-assert.strictEqual(result.inserted, 1, 'Only one row should be inserted');
-assert.deepStrictEqual(result.duplicates, ['225300', '225301'], 'Duplicates should include existing and repeated trips');
-assert.ok(Array.isArray(result.invalidRows), 'Response should include invalidRows array');
-assert.strictEqual(result.invalidRows.length, 0, 'No invalid rows should be reported');
-assert.strictEqual(appendedValues.length, 1, 'Only one row should be appended');
+assert.strictEqual(result.success, true, 'bulkAdd should succeed even with invalid rows');
+assert.strictEqual(result.inserted, 1, 'Only one valid row should be inserted');
+assert.deepStrictEqual(result.duplicates, [], 'No duplicates should be reported');
+assert.deepStrictEqual(
+  result.invalidRows,
+  [
+    'Fila 2: Trip vacío.',
+    'Fila 3: Trip inválido.',
+    'Fila 4: Trip menor a 225000.',
+    'Fila 5: Ejecutivo vacío.'
+  ],
+  'Invalid rows should include detailed issues'
+);
+assert.strictEqual(appendedValues.length, 1, 'Only one row should be appended for valid data');
 const tripIndex = headers.indexOf('Trip');
-assert.strictEqual(appendedValues[0][tripIndex], '225301', 'Trip 225301 should be inserted');
+assert.strictEqual(appendedValues[0][tripIndex], '225124', 'Trip should be trimmed and stored as string');
 
-console.log('Bulk add duplicates test passed.');
+console.log('Bulk add validation test passed.');
