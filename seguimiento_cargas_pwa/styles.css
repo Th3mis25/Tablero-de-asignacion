@@ -207,6 +207,11 @@ body {
   background-size: cover;
 }
 
+body,
+body * {
+  font-weight: 400;
+}
+
 .sheet-app {
   width: min(100%, 100vw);
   margin: 0 auto;
@@ -248,7 +253,7 @@ body {
 .sheet-app__title-group h1 {
   margin: 0;
   font-size: clamp(1.5rem, 3vw, 2.25rem);
-  font-weight: 600;
+  font-weight: normal;
   letter-spacing: -0.01em;
 }
 
@@ -342,7 +347,7 @@ body {
 }
 
 .theme-toggle__text {
-  font-weight: 500;
+  font-weight: normal;
   color: var(--sheet-text-soft);
 }
 
@@ -355,7 +360,7 @@ body {
   background: var(--button-background);
   color: var(--sheet-text);
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: normal;
   border-radius: var(--size-999);
   padding: var(--size-10) var(--size-20);
   cursor: pointer;
@@ -620,7 +625,7 @@ body {
   gap: var(--size-8);
   padding: var(--size-8) var(--size-16);
   border-radius: var(--size-999);
-  font-weight: 500;
+  font-weight: normal;
   font-size: 0.95rem;
   box-shadow: var(--shadow-sm);
 }
@@ -683,7 +688,7 @@ body {
   background: var(--button-background);
   color: var(--sheet-text);
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: normal;
   cursor: pointer;
   transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition);
   box-shadow: var(--shadow-sm);
@@ -789,7 +794,7 @@ body {
 .client-filter__option-button.is-selected {
   background: var(--accent-surface-strong);
   color: var(--accent);
-  font-weight: 600;
+  font-weight: normal;
 }
 
 .status-filter__empty,
@@ -843,7 +848,7 @@ body {
   border: none;
   background: none;
   color: var(--accent);
-  font-weight: 500;
+  font-weight: normal;
   font-size: 0.85rem;
   padding: 0;
   cursor: pointer;
@@ -862,7 +867,7 @@ body {
 
 .sheet-grid__views-label {
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: normal;
   color: var(--sheet-text-soft);
 }
 
@@ -871,7 +876,7 @@ body {
   background: rgba(255, 255, 255, 0.3);
   color: var(--sheet-text-soft);
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: normal;
   border-radius: var(--size-999);
   padding: var(--size-8) var(--size-16);
   cursor: pointer;
@@ -943,7 +948,7 @@ body {
   position: sticky;
   top: 0;
   background: var(--table-header-bg);
-  font-weight: 600;
+  font-weight: normal;
   color: var(--table-header-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1174,7 +1179,7 @@ body {
 .edit-modal__form h2 {
   margin: 0 0 var(--size-8);
   font-size: 1.5rem;
-  font-weight: 500;
+  font-weight: normal;
 }
 
 .login-modal__hint,
@@ -1192,7 +1197,7 @@ body {
 }
 
 .form-field label {
-  font-weight: 500;
+  font-weight: normal;
   color: var(--sheet-text);
 }
 
