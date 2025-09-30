@@ -2991,33 +2991,11 @@
               link.setAttribute('aria-label', 'Abrir tracking en una nueva pestaña');
               link.title = 'Abrir tracking';
 
-              const svgNamespace = 'http://www.w3.org/2000/svg';
-              const icon = doc.createElementNS(svgNamespace, 'svg');
+              const icon = doc.createElement('img');
               icon.classList.add('table-link__icon');
+              icon.setAttribute('src', 'assets/enlace-externo.png');
+              icon.setAttribute('alt', '');
               icon.setAttribute('aria-hidden', 'true');
-              icon.setAttribute('focusable', 'false');
-              icon.setAttribute('viewBox', '0 0 24 24');
-              icon.setAttribute('width', '24');
-              icon.setAttribute('height', '24');
-
-              const createPath = (d) => {
-                const path = doc.createElementNS(svgNamespace, 'path');
-                path.setAttribute('d', d);
-                path.setAttribute('fill', 'none');
-                path.setAttribute('stroke', 'currentColor');
-                path.setAttribute('stroke-width', '1.8');
-                path.setAttribute('stroke-linecap', 'round');
-                path.setAttribute('stroke-linejoin', 'round');
-                return path;
-              };
-
-              icon.appendChild(
-                createPath('M10.59 13.41a2 2 0 0 1 0-2.82l1.17-1.17a2.5 2.5 0 0 1 3.54 0l1.41 1.41a2.5 2.5 0 0 1 0 3.54l-1.17 1.17a2 2 0 0 1-2.82 0')
-              );
-              icon.appendChild(
-                createPath('M13.41 10.59a2 2 0 0 1 0 2.82l-1.17 1.17a2.5 2.5 0 0 1-3.54 0L7.29 13.17a2.5 2.5 0 0 1 0-3.54l1.17-1.17a2 2 0 0 1 2.82 0')
-              );
-
               link.appendChild(icon);
 
               const srText = doc.createElement('span');
