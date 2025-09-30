@@ -1752,6 +1752,7 @@
     const refs = {
       tableHead: doc.querySelector('[data-table-head]'),
       tableBody: doc.querySelector('[data-table-body]'),
+      loadingIndicator: doc.querySelector('[data-loading-indicator]'),
       viewMenu: doc.querySelector('[data-view-menu]'),
       status: doc.querySelector('[data-status]'),
       refreshButton: doc.querySelector('[data-action="refresh"]'),
@@ -2670,6 +2671,9 @@
       }
       if (refs.bulkUploadButton) {
         refs.bulkUploadButton.disabled = Boolean(isLoading);
+      }
+      if (refs.loadingIndicator) {
+        refs.loadingIndicator.hidden = !isLoading;
       }
       if (isLoading) {
         appRoot.classList.add('is-loading');
