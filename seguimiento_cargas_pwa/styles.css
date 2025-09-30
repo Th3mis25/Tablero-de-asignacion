@@ -212,6 +212,24 @@ body * {
   font-weight: 400;
 }
 
+body b,
+body strong,
+body .bold,
+body .fw-bold,
+body [data-text-type='bold'],
+body [style*='font-weight: bold'],
+body [style*='font-weight:bold'],
+body [style*='font-weight: 600'],
+body [style*='font-weight:600'],
+body [style*='font-weight: 700'],
+body [style*='font-weight:700'],
+body [style*='font-weight: 800'],
+body [style*='font-weight:800'],
+body [style*='font-weight: 900'],
+body [style*='font-weight:900'] {
+  font-weight: 400 !important;
+}
+
 .sheet-app {
   width: min(100%, 100vw);
   margin: 0 auto;
