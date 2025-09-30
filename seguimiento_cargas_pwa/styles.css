@@ -1133,6 +1133,14 @@ body {
 
 .edit-modal {
   width: min(var(--size-860), calc(100% - var(--size-48)));
+  height: min(calc(100vh - var(--size-80)), var(--size-980));
+}
+
+@supports (height: 100dvh) {
+  .edit-modal {
+    height: min(calc(100dvh - var(--size-80)), var(--size-980));
+    max-height: calc(100dvh - var(--size-80));
+  }
 }
 
 .edit-modal__form {
@@ -1239,6 +1247,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding-right: var(--size-4);
+  padding-bottom: var(--size-16);
+  scrollbar-gutter: stable;
 }
 
 .login-modal__actions,
