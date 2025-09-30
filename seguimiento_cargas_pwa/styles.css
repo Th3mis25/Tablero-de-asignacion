@@ -954,7 +954,7 @@ body [style*='font-weight:900'] {
 .sheet-table tbody td {
   transition: background var(--transition), box-shadow var(--transition);
   white-space: nowrap;
-  font-weight: 300;
+  font-weight: 400 !important;
 }
 
 .sheet-table tbody td .table-link-button,
@@ -966,10 +966,10 @@ body [style*='font-weight:900'] {
   position: sticky;
   top: 0;
   background: var(--table-header-bg);
-  font-weight: normal;
+  font-weight: 400 !important;
   color: var(--table-header-text);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: none !important;
+  letter-spacing: normal !important;
   font-size: 0.8rem;
   border-bottom: var(--size-1) solid var(--table-header-border);
   box-shadow: inset 0 -var(--size-1) 0 var(--table-header-border);
