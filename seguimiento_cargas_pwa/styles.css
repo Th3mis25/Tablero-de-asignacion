@@ -201,19 +201,22 @@ body {
   min-height: 100vh;
   display: flex;
   justify-content: center;
+  align-items: stretch;
+  padding: clamp(var(--size-12), 2vh, var(--size-24));
   background-attachment: fixed;
   background-size: cover;
 }
 
 .sheet-app {
-  width: 100%;
-  margin: clamp(var(--size-16), 4vw, var(--size-48)) auto;
-  padding: var(--size-32) clamp(var(--size-20), 4vw, var(--size-48)) var(--size-48);
+  width: min(1500px, 98vw);
+  margin: 0 auto;
+  padding: clamp(var(--size-24), 3vh, var(--size-40))
+    clamp(var(--size-16), 2.5vw, var(--size-32))
+    clamp(var(--size-32), 3vh, var(--size-48));
   display: flex;
   flex-direction: column;
   gap: var(--size-16);
-  min-height: 100vh;
-  max-width: min(1200px, 100%);
+  min-height: calc(100vh - clamp(var(--size-12), 2vh, var(--size-24)) * 2);
 }
 
 
