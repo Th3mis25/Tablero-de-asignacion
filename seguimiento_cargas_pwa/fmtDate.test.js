@@ -8,6 +8,11 @@ assert.strictEqual(fmtDate(isoSample, DEFAULT_LOCALE), '09/06/2024 15:30');
 assert.strictEqual(fmtDate(isoSample, 'de-DE'), '09.06.2024 15:30');
 assert.strictEqual(fmtDate(isoSample), '09/06/2024 15:30');
 
+const isoDateOnlySample = '2025-09-01';
+assert.strictEqual(fmtDate(isoDateOnlySample, 'en-US'), '09/01/2025 00:00');
+assert.strictEqual(fmtDate(isoDateOnlySample, DEFAULT_LOCALE), '01/09/2025 00:00');
+assert.strictEqual(fmtDate(isoDateOnlySample, 'de-DE'), '01.09.2025 00:00');
+
 const customSample = '09/06/2024 15:30:00';
 
 assert.strictEqual(fmtDate(customSample, 'en-US'), '06/09/2024 15:30');

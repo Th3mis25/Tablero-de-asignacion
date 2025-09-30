@@ -108,6 +108,17 @@
       };
     }
 
+    const isoDateOnlyMatch = value.match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})$/);
+    if (isoDateOnlyMatch) {
+      return {
+        year: parseYear(isoDateOnlyMatch[1]),
+        month: parseInt(isoDateOnlyMatch[2], 10),
+        day: parseInt(isoDateOnlyMatch[3], 10),
+        hour: 0,
+        minute: 0
+      };
+    }
+
     const dmyMatch = value.match(/^([0-9]{1,2})[\/\-.]([0-9]{1,2})[\/\-.]([0-9]{2,4})(?:[ T]([0-9]{1,2}):([0-9]{2})(?::([0-9]{2}))?(?:\s*([AP])M)?)?$/i);
     if (dmyMatch) {
       let hour = dmyMatch[4] != null ? parseInt(dmyMatch[4], 10) : 0;
