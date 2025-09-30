@@ -934,6 +934,11 @@ body {
   font-weight: 400;
 }
 
+.sheet-table tbody td .table-link-button,
+.sheet-table tbody td .status-badge {
+  font-weight: 400;
+}
+
 .sheet-table thead th {
   position: sticky;
   top: 0;
@@ -991,7 +996,7 @@ body {
   padding: 0.125rem 0.55rem;
   border-radius: var(--size-999);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.2;
   letter-spacing: 0.01em;
   background: var(--status-default-bg);
