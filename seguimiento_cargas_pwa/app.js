@@ -1113,6 +1113,631 @@
     }
   }
 
+  const BULK_ALLOWED_EXTENSIONS = new Set(['xlsx', 'xlsm']);
+  const BULK_REQUIRED_HEADERS = ['Trip', 'Ejecutivo'];
+  const BULK_TEXT_HEADERS = [
+    'Caja',
+    'Estatus',
+    'Cliente',
+    'Destino',
+    'Referencia',
+    'Segmento',
+    'TR-MX',
+    'TR-USA',
+    'Comentarios',
+    'Docs',
+    'Tracking'
+  ];
+  const BULK_DATE_HEADERS = ['Cita carga', 'Llegada carga', 'Cita entrega', 'Llegada entrega'];
+  const BULK_OPTIONAL_HEADERS = BULK_TEXT_HEADERS.concat(BULK_DATE_HEADERS);
+  const BULK_CANONICAL_HEADERS = BULK_REQUIRED_HEADERS.concat(BULK_OPTIONAL_HEADERS);
+  const BULK_HEADER_NORMALIZATION_MAP = (function () {
+    const map = {};
+    BULK_CANONICAL_HEADERS.forEach(function (label) {
+      if (label) {
+        map[label.trim().toLowerCase()] = label;
+      }
+    });
+    map['status'] = 'Estatus';
+    map['cita carga'] = 'Cita carga';
+    map['citacarga'] = 'Cita carga';
+    map['cita de carga'] = 'Cita carga';
+    map['cita_carga'] = 'Cita carga';
+    map['cita entrega'] = 'Cita entrega';
+    map['citaentrega'] = 'Cita entrega';
+    map['cita de entrega'] = 'Cita entrega';
+    map['cita_entrega'] = 'Cita entrega';
+    return map;
+  })();
+  const BULK_DATE_HEADER_SET = new Set(BULK_DATE_HEADERS);
+  const BUILTIN_DATE_FORMAT_IDS = new Set([
+    14, 15, 16, 17, 18, 19, 20, 21, 22,
+    27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+    45, 46, 47,
+    50, 51, 52, 53, 54, 55, 56, 57, 58
+  ]);
+  const textDecoder = typeof global.TextDecoder === 'function' ? new global.TextDecoder('utf-8') : null;
+
+  function normalizeBulkHeader(name) {
+    if (name == null) {
+      return '';
+    }
+    const normalized = String(name).trim().toLowerCase();
+    if (!normalized) {
+      return '';
+    }
+    if (Object.prototype.hasOwnProperty.call(BULK_HEADER_NORMALIZATION_MAP, normalized)) {
+      return BULK_HEADER_NORMALIZATION_MAP[normalized];
+    }
+    return '';
+  }
+
+  function getFileExtension(filename) {
+    if (!filename) {
+      return '';
+    }
+    const match = String(filename)
+      .trim()
+      .toLowerCase()
+      .match(/\.([0-9a-z]+)$/i);
+    return match ? match[1] : '';
+  }
+
+  function normalizeZipPath(path) {
+    if (!path) {
+      return '';
+    }
+    const segments = [];
+    const parts = String(path)
+      .replace(/\\/g, '/')
+      .split('/');
+    parts.forEach(function (part) {
+      if (!part || part === '.') {
+        return;
+      }
+      if (part === '..') {
+        if (segments.length > 0) {
+          segments.pop();
+        }
+        return;
+      }
+      segments.push(part);
+    });
+    return segments.join('/');
+  }
+
+  function resolveSheetPath(target) {
+    if (!target) {
+      return '';
+    }
+    let normalized = String(target).trim();
+    if (!normalized) {
+      return '';
+    }
+    if (normalized[0] === '/') {
+      normalized = normalized.slice(1);
+    }
+    if (!/^xl\//i.test(normalized)) {
+      normalized = `xl/${normalized}`;
+    }
+    return normalizeZipPath(normalized);
+  }
+
+  function parseXmlDocument(xmlText) {
+    if (typeof global.DOMParser !== 'function') {
+      throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
+    }
+    const parser = new global.DOMParser();
+    const doc = parser.parseFromString(String(xmlText || ''), 'application/xml');
+    const errorNode = doc.getElementsByTagName('parsererror')[0];
+    if (errorNode) {
+      throw new Error('El archivo de Excel contiene datos XML no válidos.');
+    }
+    return doc;
+  }
+
+  function excelSerialToDate(serial) {
+    if (!Number.isFinite(serial)) {
+      return null;
+    }
+    const adjusted = serial >= 60 ? serial - 1 : serial;
+    const wholeDays = Math.floor(adjusted);
+    const fractionalDay = adjusted - wholeDays;
+    const baseDate = new Date(1899, 11, 30);
+    baseDate.setDate(baseDate.getDate() + wholeDays);
+    if (fractionalDay > 0) {
+      const totalSeconds = Math.round(fractionalDay * 24 * 60 * 60);
+      let seconds = totalSeconds % 60;
+      let totalMinutes = (totalSeconds - seconds) / 60;
+      let minutes = totalMinutes % 60;
+      let hours = (totalMinutes - minutes) / 60;
+      if (hours >= 24) {
+        baseDate.setDate(baseDate.getDate() + Math.floor(hours / 24));
+        hours = hours % 24;
+      }
+      baseDate.setHours(hours, minutes, seconds, 0);
+    } else {
+      baseDate.setHours(0, 0, 0, 0);
+    }
+    return baseDate;
+  }
+
+  function formatDateForApi(date) {
+    if (!(date instanceof Date) || isNaN(date.getTime())) {
+      return '';
+    }
+    return (
+      date.getFullYear() +
+      '-' + pad2(date.getMonth() + 1) +
+      '-' + pad2(date.getDate()) +
+      'T' + pad2(date.getHours()) +
+      ':' + pad2(date.getMinutes()) +
+      ':' + pad2(date.getSeconds())
+    );
+  }
+
+  function convertBulkDateValue(input) {
+    if (input == null || input === '') {
+      return { value: '' };
+    }
+    if (input instanceof Date) {
+      if (isNaN(input.getTime())) {
+        return { value: '', error: 'Fecha inválida' };
+      }
+      return { value: formatDateForApi(input) };
+    }
+    if (typeof input === 'number') {
+      const date = excelSerialToDate(input);
+      if (!date) {
+        return { value: '', error: 'Fecha inválida' };
+      }
+      return { value: formatDateForApi(date) };
+    }
+    const trimmed = String(input).trim();
+    if (!trimmed) {
+      return { value: '' };
+    }
+    if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+      const numericValue = Number(trimmed);
+      if (Number.isFinite(numericValue)) {
+        const numericDate = excelSerialToDate(numericValue);
+        if (numericDate) {
+          return { value: formatDateForApi(numericDate) };
+        }
+      }
+    }
+    const isoValue = toApiDateValue(trimmed);
+    if (!isoValue) {
+      return { value: '', error: 'Formato de fecha no reconocido' };
+    }
+    return { value: isoValue };
+  }
+
+  function summarizeValues(values, maxItems) {
+    if (!Array.isArray(values) || values.length === 0) {
+      return '';
+    }
+    const limit = typeof maxItems === 'number' && maxItems > 0 ? maxItems : values.length;
+    const visible = values.slice(0, limit);
+    const summary = visible.join(', ');
+    const remaining = values.length - visible.length;
+    if (remaining > 0) {
+      return `${summary} y ${remaining} más`;
+    }
+    return summary;
+  }
+
+  function summarizeIssues(issues, maxItems) {
+    if (!Array.isArray(issues) || issues.length === 0) {
+      return '';
+    }
+    const limit = typeof maxItems === 'number' && maxItems > 0 ? maxItems : issues.length;
+    const visible = issues.slice(0, limit);
+    let summary = visible.join(' ');
+    const remaining = issues.length - visible.length;
+    if (remaining > 0) {
+      summary += ` (+${remaining} filas adicionales)`;
+    }
+    return summary;
+  }
+
+  function columnLabelToIndex(cellReference) {
+    if (!cellReference) {
+      return null;
+    }
+    const match = String(cellReference).match(/^[A-Z]+/i);
+    if (!match) {
+      return null;
+    }
+    const letters = match[0].toUpperCase();
+    let index = 0;
+    for (let i = 0; i < letters.length; i++) {
+      index = index * 26 + (letters.charCodeAt(i) - 64);
+    }
+    return index - 1;
+  }
+
+  function parseSharedStringsXml(xmlText) {
+    const doc = parseXmlDocument(xmlText);
+    const siNodes = doc.getElementsByTagName('si');
+    const strings = [];
+    for (let i = 0; i < siNodes.length; i++) {
+      const si = siNodes[i];
+      const tNodes = si.getElementsByTagName('t');
+      if (tNodes.length === 0) {
+        strings.push('');
+        continue;
+      }
+      let text = '';
+      for (let j = 0; j < tNodes.length; j++) {
+        text += tNodes[j].textContent || '';
+      }
+      strings.push(text);
+    }
+    return strings;
+  }
+
+  function isDateFormatCode(formatCode) {
+    if (!formatCode) {
+      return false;
+    }
+    const cleaned = String(formatCode)
+      .replace(/"[^"]*"/g, '')
+      .replace(/\[[^\]]*\]/g, '')
+      .toLowerCase();
+    if (!cleaned) {
+      return false;
+    }
+    if (cleaned.includes('am/pm')) {
+      return true;
+    }
+    const hasYear = cleaned.indexOf('y') > -1;
+    const hasDay = cleaned.indexOf('d') > -1;
+    const hasMonth = cleaned.indexOf('m') > -1;
+    const hasHour = cleaned.indexOf('h') > -1;
+    const hasSecond = cleaned.indexOf('s') > -1;
+    if ((hasYear && hasMonth) || (hasDay && hasMonth) || (hasYear && hasDay)) {
+      return true;
+    }
+    if (hasHour && (hasMonth || hasDay || hasSecond)) {
+      return true;
+    }
+    if (hasHour && cleaned.indexOf('m') > -1) {
+      return true;
+    }
+    if (hasSecond && cleaned.indexOf('m') > -1) {
+      return true;
+    }
+    return false;
+  }
+
+  function parseStylesXml(xmlText) {
+    const doc = parseXmlDocument(xmlText);
+    const numFmtNodes = doc.getElementsByTagName('numFmt');
+    const numFmtMap = {};
+    for (let i = 0; i < numFmtNodes.length; i++) {
+      const node = numFmtNodes[i];
+      const idAttr = node.getAttribute('numFmtId');
+      const codeAttr = node.getAttribute('formatCode');
+      if (idAttr == null) {
+        continue;
+      }
+      const numFmtId = parseInt(idAttr, 10);
+      if (Number.isFinite(numFmtId)) {
+        numFmtMap[numFmtId] = codeAttr || '';
+      }
+    }
+    const cellXfs = [];
+    const cellXfsNode = doc.getElementsByTagName('cellXfs')[0];
+    if (cellXfsNode) {
+      const xfNodes = cellXfsNode.getElementsByTagName('xf');
+      for (let i = 0; i < xfNodes.length; i++) {
+        const xf = xfNodes[i];
+        const numFmtIdAttr = xf.getAttribute('numFmtId');
+        const numFmtId = numFmtIdAttr == null ? NaN : parseInt(numFmtIdAttr, 10);
+        cellXfs.push(Number.isFinite(numFmtId) ? numFmtId : null);
+      }
+    }
+    return { numFmtMap: numFmtMap, cellXfs: cellXfs };
+  }
+
+  function isDateStyle(styleIndex, stylesInfo) {
+    if (!stylesInfo || !Array.isArray(stylesInfo.cellXfs)) {
+      return false;
+    }
+    if (!Number.isFinite(styleIndex)) {
+      return false;
+    }
+    const numFmtId = stylesInfo.cellXfs[styleIndex];
+    if (numFmtId == null) {
+      return false;
+    }
+    if (BUILTIN_DATE_FORMAT_IDS.has(numFmtId)) {
+      return true;
+    }
+    const code = stylesInfo.numFmtMap[numFmtId];
+    return isDateFormatCode(code);
+  }
+
+  function extractSheetRows(sheetXml, sharedStrings, stylesInfo) {
+    const doc = parseXmlDocument(sheetXml);
+    const sheetData = doc.getElementsByTagName('sheetData')[0];
+    if (!sheetData) {
+      throw new Error('El archivo de Excel no contiene datos en la hoja principal.');
+    }
+    const rows = [];
+    const rowNodes = sheetData.getElementsByTagName('row');
+    for (let i = 0; i < rowNodes.length; i++) {
+      const rowNode = rowNodes[i];
+      const cellNodes = rowNode.getElementsByTagName('c');
+      const row = [];
+      for (let j = 0; j < cellNodes.length; j++) {
+        const cellNode = cellNodes[j];
+        const ref = cellNode.getAttribute('r');
+        const index = columnLabelToIndex(ref);
+        const type = cellNode.getAttribute('t');
+        const styleAttr = cellNode.getAttribute('s');
+        const styleIndex = styleAttr == null ? NaN : parseInt(styleAttr, 10);
+        let value = '';
+        const valueNode = cellNode.getElementsByTagName('v')[0];
+        if (valueNode && valueNode.textContent != null) {
+          value = valueNode.textContent;
+        }
+        if (type === 's') {
+          const sharedIndex = parseInt(value, 10);
+          if (Number.isFinite(sharedIndex) && sharedIndex >= 0 && sharedIndex < sharedStrings.length) {
+            value = sharedStrings[sharedIndex];
+          } else {
+            value = '';
+          }
+        } else if (type === 'b') {
+          value = value === '1' ? true : value === '0' ? false : '';
+        } else if (value && !Number.isNaN(Number(value))) {
+          const numeric = Number(value);
+          if (isDateStyle(styleIndex, stylesInfo)) {
+            const dateValue = excelSerialToDate(numeric);
+            value = dateValue ? formatDateForApi(dateValue) : '';
+          } else {
+            value = numeric;
+          }
+        }
+        row[index != null ? index : j] = value;
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function createZipReader(arrayBuffer) {
+    if (typeof global.DecompressionStream === 'undefined') {
+      throw new Error('Este navegador no soporta la descompresión de archivos .xlsx.');
+    }
+    if (typeof global.JSZip !== 'function') {
+      throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
+    }
+    const zip = new global.JSZip();
+    return zip.loadAsync(arrayBuffer).then(function (archive) {
+      const entries = {};
+      archive.forEach(function (relativePath, file) {
+        entries[relativePath] = file;
+      });
+
+      async function decompressEntry(entry) {
+        if (!entry) {
+          throw new Error('El archivo de Excel está incompleto.');
+        }
+        if (entry._data && entry._data.compressedContent) {
+          const stream = entry._data.compressedContent();
+          const decompressedStream = stream.pipeThrough(new global.DecompressionStream('deflate'));
+          const response = new global.Response(decompressedStream);
+          return response.arrayBuffer();
+        }
+        if (entry.async) {
+          const buffer = await entry.async('arraybuffer');
+          return buffer;
+        }
+        throw new Error('El archivo de Excel usa un método de compresión no soportado.');
+      }
+
+      if (!textDecoder) {
+        throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
+      }
+
+      return {
+        has: function (name) {
+          return Object.prototype.hasOwnProperty.call(entries, name);
+        },
+        readText: async function (name) {
+          if (!Object.prototype.hasOwnProperty.call(entries, name)) {
+            throw new Error(`El archivo de Excel no contiene el recurso "${name}".`);
+          }
+          const buffer = await decompressEntry(entries[name]);
+          return textDecoder.decode(new Uint8Array(buffer));
+        }
+      };
+    });
+  }
+
+  async function parseXlsxRows(arrayBuffer) {
+    const zipReader = await createZipReader(arrayBuffer);
+    const workbookXml = await zipReader.readText('xl/workbook.xml').catch(function () {
+      throw new Error('El archivo de Excel no contiene la información del libro.');
+    });
+    const workbookDoc = parseXmlDocument(workbookXml);
+    const sheets = workbookDoc.getElementsByTagName('sheet');
+    if (!sheets || sheets.length === 0) {
+      throw new Error('El archivo de Excel no contiene hojas de cálculo.');
+    }
+    const firstSheet = sheets[0];
+    const relId = firstSheet.getAttribute('r:id') || firstSheet.getAttribute('r:Id');
+    if (!relId) {
+      throw new Error('No se pudo determinar la hoja principal del archivo.');
+    }
+    const relsXml = await zipReader.readText('xl/_rels/workbook.xml.rels').catch(function () {
+      throw new Error('El archivo de Excel no contiene la información de relaciones necesaria.');
+    });
+    const relsDoc = parseXmlDocument(relsXml);
+    const relationshipNodes = relsDoc.getElementsByTagName('Relationship');
+    let sheetTarget = '';
+    for (let i = 0; i < relationshipNodes.length; i++) {
+      const rel = relationshipNodes[i];
+      const idAttr = rel.getAttribute('Id');
+      if (idAttr === relId) {
+        sheetTarget = rel.getAttribute('Target') || '';
+        break;
+      }
+    }
+    if (!sheetTarget) {
+      throw new Error('No se encontró la hoja principal del archivo.');
+    }
+    const sheetPath = resolveSheetPath(sheetTarget);
+    const sheetXml = await zipReader.readText(sheetPath).catch(function () {
+      throw new Error('No se pudo leer la hoja principal del archivo.');
+    });
+
+    let sharedStrings = [];
+    if (zipReader.has('xl/sharedStrings.xml')) {
+      const sharedXml = await zipReader.readText('xl/sharedStrings.xml');
+      sharedStrings = parseSharedStringsXml(sharedXml);
+    }
+
+    let stylesInfo = null;
+    if (zipReader.has('xl/styles.xml')) {
+      const stylesXml = await zipReader.readText('xl/styles.xml');
+      stylesInfo = parseStylesXml(stylesXml);
+    }
+
+    return extractSheetRows(sheetXml, sharedStrings, stylesInfo);
+  }
+
+  function readExcelFile(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file) {
+        reject(new Error('Selecciona un archivo de Excel para continuar.'));
+        return;
+      }
+      const reader = new global.FileReader();
+      reader.onerror = function () {
+        reject(new Error('No se pudo leer el archivo seleccionado.'));
+      };
+      reader.onload = function (event) {
+        try {
+          const result = event && event.target ? event.target.result : null;
+          if (!(result instanceof ArrayBuffer)) {
+            throw new Error('El archivo de Excel no se pudo interpretar.');
+          }
+          parseXlsxRows(result).then(resolve).catch(function (err) {
+            reject(err instanceof Error ? err : new Error('No se pudo procesar el archivo de Excel.'));
+          });
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error('No se pudo procesar el archivo de Excel.'));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function prepareBulkRows(rawRows) {
+    const issues = [];
+    const prepared = [];
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      return { rows: [], issues: ['El archivo no contiene filas con datos.'] };
+    }
+
+    const headerSet = new Set();
+    rawRows.forEach(function (row) {
+      if (!row || typeof row !== 'object') {
+        return;
+      }
+      Object.keys(row).forEach(function (key) {
+        const canonical = normalizeBulkHeader(key);
+        if (canonical) {
+          headerSet.add(canonical);
+        }
+      });
+    });
+
+    const missingHeaders = BULK_REQUIRED_HEADERS.filter(function (label) {
+      return !headerSet.has(label);
+    });
+    if (missingHeaders.length > 0) {
+      return {
+        rows: [],
+        issues: [`Faltan las columnas obligatorias: ${missingHeaders.join(', ')}.`]
+      };
+    }
+
+    rawRows.forEach(function (row, index) {
+      if (!row || typeof row !== 'object') {
+        return;
+      }
+
+      const normalizedValues = {};
+      let hasAnyValue = false;
+      Object.keys(row).forEach(function (key) {
+        const canonical = normalizeBulkHeader(key);
+        if (!canonical) {
+          return;
+        }
+        const value = row[key];
+        if (value instanceof Date && !isNaN(value.getTime())) {
+          hasAnyValue = true;
+        } else if (value != null && String(value).trim() !== '') {
+          hasAnyValue = true;
+        }
+        normalizedValues[canonical] = value;
+      });
+
+      if (!hasAnyValue) {
+        return;
+      }
+
+      const rowNumber = index + 2;
+      const rowIssues = [];
+      const output = {};
+
+      const rawTrip = normalizedValues.Trip;
+      const tripValue = rawTrip == null ? '' : String(rawTrip).trim();
+      if (!tripValue) {
+        rowIssues.push('Trip vacío');
+      } else if (!/^\d+$/.test(tripValue)) {
+        rowIssues.push('Trip inválido');
+      } else if (Number(tripValue) < 225000) {
+        rowIssues.push('Trip menor a 225000');
+      }
+      output.Trip = tripValue;
+
+      const rawEjecutivo = normalizedValues.Ejecutivo;
+      const ejecutivoValue = rawEjecutivo == null ? '' : String(rawEjecutivo).trim();
+      if (!ejecutivoValue) {
+        rowIssues.push('Ejecutivo vacío');
+      }
+      output.Ejecutivo = ejecutivoValue;
+
+      BULK_TEXT_HEADERS.forEach(function (label) {
+        const rawValue = normalizedValues[label];
+        const value = rawValue == null ? '' : String(rawValue).trim();
+        output[label] = value;
+      });
+
+      BULK_DATE_HEADERS.forEach(function (label) {
+        const conversion = convertBulkDateValue(normalizedValues[label]);
+        if (conversion.error) {
+          rowIssues.push(`${label}: ${conversion.error}`);
+        }
+        output[label] = conversion.value;
+      });
+
+      if (rowIssues.length === 0) {
+        prepared.push(output);
+      } else {
+        issues.push(`Fila ${rowNumber}: ${rowIssues.join(', ')}.`);
+      }
+    });
+
+    return { rows: prepared, issues: issues };
+  }
+
   function initApp() {
     if (!global.document) {
       return;
@@ -1267,810 +1892,6 @@
       }
     };
 
-
-    const BULK_ALLOWED_EXTENSIONS = new Set(['xlsx', 'xlsm']);
-    const BULK_REQUIRED_HEADERS = ['Trip', 'Ejecutivo'];
-    const BULK_OPTIONAL_HEADERS = [
-      'Caja',
-      'Estatus',
-      'Cliente',
-      'Destino',
-      'Referencia',
-      'Segmento',
-      'Cita carga',
-      'Cita entrega'
-    ];
-    const BULK_CANONICAL_HEADERS = BULK_REQUIRED_HEADERS.concat(BULK_OPTIONAL_HEADERS);
-    const BULK_HEADER_NORMALIZATION_MAP = (function () {
-      const map = {};
-      BULK_CANONICAL_HEADERS.forEach(function (label) {
-        if (label) {
-          map[label.trim().toLowerCase()] = label;
-        }
-      });
-      map['status'] = 'Estatus';
-      map['cita carga'] = 'Cita carga';
-      map['citacarga'] = 'Cita carga';
-      map['cita de carga'] = 'Cita carga';
-      map['cita_carga'] = 'Cita carga';
-      map['cita entrega'] = 'Cita entrega';
-      map['citaentrega'] = 'Cita entrega';
-      map['cita de entrega'] = 'Cita entrega';
-      map['cita_entrega'] = 'Cita entrega';
-      return map;
-    })();
-    const BULK_DATE_HEADER_SET = new Set(['Cita carga', 'Cita entrega']);
-    const BUILTIN_DATE_FORMAT_IDS = new Set([
-      14, 15, 16, 17, 18, 19, 20, 21, 22,
-      27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
-      45, 46, 47,
-      50, 51, 52, 53, 54, 55, 56, 57, 58
-    ]);
-
-    function normalizeBulkHeader(name) {
-      if (name == null) {
-        return '';
-      }
-      const normalized = String(name).trim().toLowerCase();
-      if (!normalized) {
-        return '';
-      }
-      if (Object.prototype.hasOwnProperty.call(BULK_HEADER_NORMALIZATION_MAP, normalized)) {
-        return BULK_HEADER_NORMALIZATION_MAP[normalized];
-      }
-      return '';
-    }
-
-    function getFileExtension(filename) {
-      if (!filename) {
-        return '';
-      }
-      const match = String(filename)
-        .trim()
-        .toLowerCase()
-        .match(/\.([0-9a-z]+)$/i);
-      return match ? match[1] : '';
-    }
-
-    function normalizeZipPath(path) {
-      if (!path) {
-        return '';
-      }
-      const segments = [];
-      const parts = String(path)
-        .replace(/\\/g, '/')
-        .split('/');
-      parts.forEach(function (part) {
-        if (!part || part === '.') {
-          return;
-        }
-        if (part === '..') {
-          if (segments.length > 0) {
-            segments.pop();
-          }
-          return;
-        }
-        segments.push(part);
-      });
-      return segments.join('/');
-    }
-
-    function resolveSheetPath(target) {
-      if (!target) {
-        return '';
-      }
-      let normalized = String(target).trim();
-      if (!normalized) {
-        return '';
-      }
-      if (normalized[0] === '/') {
-        normalized = normalized.slice(1);
-      }
-      if (!/^xl\//i.test(normalized)) {
-        normalized = `xl/${normalized}`;
-      }
-      return normalizeZipPath(normalized);
-    }
-
-    function parseXmlDocument(xmlText) {
-      if (typeof global.DOMParser !== 'function') {
-        throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
-      }
-      const parser = new global.DOMParser();
-      const doc = parser.parseFromString(String(xmlText || ''), 'application/xml');
-      const errorNode = doc.getElementsByTagName('parsererror')[0];
-      if (errorNode) {
-        throw new Error('El archivo de Excel contiene datos XML no válidos.');
-      }
-      return doc;
-    }
-
-    function excelSerialToDate(serial) {
-      if (!Number.isFinite(serial)) {
-        return null;
-      }
-      const adjusted = serial >= 60 ? serial - 1 : serial;
-      const wholeDays = Math.floor(adjusted);
-      const fractionalDay = adjusted - wholeDays;
-      const baseDate = new Date(1899, 11, 30);
-      baseDate.setDate(baseDate.getDate() + wholeDays);
-      if (fractionalDay > 0) {
-        const totalSeconds = Math.round(fractionalDay * 24 * 60 * 60);
-        let seconds = totalSeconds % 60;
-        let totalMinutes = (totalSeconds - seconds) / 60;
-        let minutes = totalMinutes % 60;
-        let hours = (totalMinutes - minutes) / 60;
-        if (hours >= 24) {
-          baseDate.setDate(baseDate.getDate() + Math.floor(hours / 24));
-          hours = hours % 24;
-        }
-        baseDate.setHours(hours, minutes, seconds, 0);
-      } else {
-        baseDate.setHours(0, 0, 0, 0);
-      }
-      return baseDate;
-    }
-
-    function formatDateForApi(date) {
-      if (!(date instanceof Date) || isNaN(date.getTime())) {
-        return '';
-      }
-      return (
-        date.getFullYear() +
-        '-' + pad2(date.getMonth() + 1) +
-        '-' + pad2(date.getDate()) +
-        'T' + pad2(date.getHours()) +
-        ':' + pad2(date.getMinutes()) +
-        ':' + pad2(date.getSeconds())
-      );
-    }
-
-    function convertBulkDateValue(input) {
-      if (input == null || input === '') {
-        return { value: '' };
-      }
-      if (input instanceof Date) {
-        if (isNaN(input.getTime())) {
-          return { value: '', error: 'Fecha inválida' };
-        }
-        return { value: formatDateForApi(input) };
-      }
-      if (typeof input === 'number') {
-        const date = excelSerialToDate(input);
-        if (!date) {
-          return { value: '', error: 'Fecha inválida' };
-        }
-        return { value: formatDateForApi(date) };
-      }
-      const trimmed = String(input).trim();
-      if (!trimmed) {
-        return { value: '' };
-      }
-      if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
-        const numericValue = Number(trimmed);
-        if (Number.isFinite(numericValue)) {
-          const numericDate = excelSerialToDate(numericValue);
-          if (numericDate) {
-            return { value: formatDateForApi(numericDate) };
-          }
-        }
-      }
-      const isoValue = toApiDateValue(trimmed);
-      if (!isoValue) {
-        return { value: '', error: 'Formato de fecha no reconocido' };
-      }
-      return { value: isoValue };
-    }
-
-    function summarizeValues(values, maxItems) {
-      if (!Array.isArray(values) || values.length === 0) {
-        return '';
-      }
-      const limit = typeof maxItems === 'number' && maxItems > 0 ? maxItems : values.length;
-      const visible = values.slice(0, limit);
-      const remaining = values.length - visible.length;
-      const summary = visible.join(', ');
-      if (remaining > 0) {
-        return `${summary} y ${remaining} más`;
-      }
-      return summary;
-    }
-
-    function summarizeIssues(issues, maxItems) {
-      if (!Array.isArray(issues) || issues.length === 0) {
-        return '';
-      }
-      const limit = typeof maxItems === 'number' && maxItems > 0 ? maxItems : issues.length;
-      const visible = issues.slice(0, limit);
-      let summary = visible.join(' ');
-      const remaining = issues.length - visible.length;
-      if (remaining > 0) {
-        summary += ` (+${remaining} filas adicionales)`;
-      }
-      return summary;
-    }
-
-    function columnLabelToIndex(cellReference) {
-      if (!cellReference) {
-        return null;
-      }
-      const match = String(cellReference).match(/^[A-Z]+/i);
-      if (!match) {
-        return null;
-      }
-      const letters = match[0].toUpperCase();
-      let index = 0;
-      for (let i = 0; i < letters.length; i++) {
-        index = index * 26 + (letters.charCodeAt(i) - 64);
-      }
-      return index - 1;
-    }
-
-    function parseSharedStringsXml(xmlText) {
-      const doc = parseXmlDocument(xmlText);
-      const siNodes = doc.getElementsByTagName('si');
-      const strings = [];
-      for (let i = 0; i < siNodes.length; i++) {
-        const si = siNodes[i];
-        const tNodes = si.getElementsByTagName('t');
-        if (tNodes.length === 0) {
-          strings.push('');
-          continue;
-        }
-        let text = '';
-        for (let j = 0; j < tNodes.length; j++) {
-          text += tNodes[j].textContent || '';
-        }
-        strings.push(text);
-      }
-      return strings;
-    }
-
-    function isDateFormatCode(formatCode) {
-      if (!formatCode) {
-        return false;
-      }
-      const cleaned = String(formatCode)
-        .replace(/"[^"]*"/g, '')
-        .replace(/\[[^\]]*\]/g, '')
-        .toLowerCase();
-      if (!cleaned) {
-        return false;
-      }
-      if (cleaned.includes('am/pm')) {
-        return true;
-      }
-      const hasYear = cleaned.indexOf('y') > -1;
-      const hasDay = cleaned.indexOf('d') > -1;
-      const hasMonth = cleaned.indexOf('m') > -1;
-      const hasHour = cleaned.indexOf('h') > -1;
-      const hasSecond = cleaned.indexOf('s') > -1;
-      if ((hasYear && hasMonth) || (hasDay && hasMonth) || (hasYear && hasDay)) {
-        return true;
-      }
-      if (hasHour && (hasMonth || hasDay || hasSecond)) {
-        return true;
-      }
-      if (hasHour && cleaned.indexOf('m') > -1) {
-        return true;
-      }
-      if (hasSecond && cleaned.indexOf('m') > -1) {
-        return true;
-      }
-      return false;
-    }
-
-    function parseStylesXml(xmlText) {
-      const doc = parseXmlDocument(xmlText);
-      const numFmtNodes = doc.getElementsByTagName('numFmt');
-      const numFmtMap = {};
-      for (let i = 0; i < numFmtNodes.length; i++) {
-        const node = numFmtNodes[i];
-        const idAttr = node.getAttribute('numFmtId');
-        const codeAttr = node.getAttribute('formatCode');
-        if (idAttr == null) {
-          continue;
-        }
-        const numFmtId = parseInt(idAttr, 10);
-        if (Number.isFinite(numFmtId)) {
-          numFmtMap[numFmtId] = codeAttr || '';
-        }
-      }
-      const cellXfs = [];
-      const cellXfsNode = doc.getElementsByTagName('cellXfs')[0];
-      if (cellXfsNode) {
-        const xfNodes = cellXfsNode.getElementsByTagName('xf');
-        for (let i = 0; i < xfNodes.length; i++) {
-          const xf = xfNodes[i];
-          const numFmtIdAttr = xf.getAttribute('numFmtId');
-          const numFmtId = numFmtIdAttr == null ? NaN : parseInt(numFmtIdAttr, 10);
-          cellXfs.push(Number.isFinite(numFmtId) ? numFmtId : null);
-        }
-      }
-      return { numFmtMap: numFmtMap, cellXfs: cellXfs };
-    }
-
-    function isDateStyle(styleIndex, stylesInfo) {
-      if (!stylesInfo || !Array.isArray(stylesInfo.cellXfs)) {
-        return false;
-      }
-      if (!Number.isFinite(styleIndex) || styleIndex < 0 || styleIndex >= stylesInfo.cellXfs.length) {
-        return false;
-      }
-      const numFmtId = stylesInfo.cellXfs[styleIndex];
-      if (!Number.isFinite(numFmtId)) {
-        return false;
-      }
-      if (BUILTIN_DATE_FORMAT_IDS.has(numFmtId)) {
-        return true;
-      }
-      if (!stylesInfo.numFmtMap || !Object.prototype.hasOwnProperty.call(stylesInfo.numFmtMap, numFmtId)) {
-        return false;
-      }
-      return isDateFormatCode(stylesInfo.numFmtMap[numFmtId]);
-    }
-
-    function readCellValue(cellNode, sharedStrings, stylesInfo) {
-      if (!cellNode) {
-        return '';
-      }
-      const typeAttr = cellNode.getAttribute('t') || '';
-      const styleAttr = cellNode.getAttribute('s');
-      const styleIndex = styleAttr == null ? NaN : parseInt(styleAttr, 10);
-
-      if (typeAttr === 'inlineStr') {
-        const tNodes = cellNode.getElementsByTagName('t');
-        if (tNodes.length === 0) {
-          return '';
-        }
-        let text = '';
-        for (let i = 0; i < tNodes.length; i++) {
-          text += tNodes[i].textContent || '';
-        }
-        return text;
-      }
-
-      if (typeAttr === 'b') {
-        const valueNode = cellNode.getElementsByTagName('v')[0];
-        const raw = valueNode ? valueNode.textContent || '' : '';
-        return raw === '1' ? '1' : raw === '0' ? '0' : raw;
-      }
-
-      const valueNode = cellNode.getElementsByTagName('v')[0];
-      const rawValue = valueNode ? valueNode.textContent || '' : '';
-
-      if (typeAttr === 's') {
-        const index = parseInt(rawValue, 10);
-        if (Number.isFinite(index) && Array.isArray(sharedStrings) && index >= 0 && index < sharedStrings.length) {
-          return sharedStrings[index];
-        }
-        return '';
-      }
-
-      if (typeAttr === 'str') {
-        return rawValue;
-      }
-
-      if (typeAttr === 'd') {
-        const dateValue = new Date(rawValue);
-        if (!isNaN(dateValue.getTime())) {
-          return dateValue;
-        }
-        return rawValue;
-      }
-
-      if (!rawValue) {
-        return '';
-      }
-
-      const numeric = Number(rawValue);
-      if (Number.isFinite(numeric)) {
-        if (isDateStyle(styleIndex, stylesInfo)) {
-          const date = excelSerialToDate(numeric);
-          return date || '';
-        }
-        return numeric;
-      }
-
-      return rawValue;
-    }
-
-    function extractSheetRows(sheetXml, sharedStrings, stylesInfo) {
-      const doc = parseXmlDocument(sheetXml);
-      const sheetData = doc.getElementsByTagName('sheetData')[0];
-      if (!sheetData) {
-        return [];
-      }
-      const rowNodes = sheetData.getElementsByTagName('row');
-      const rows = [];
-      let maxColumnIndex = 0;
-      for (let i = 0; i < rowNodes.length; i++) {
-        const rowNode = rowNodes[i];
-        const rowIndexAttr = rowNode.getAttribute('r');
-        const rowIndex = rowIndexAttr == null ? i : parseInt(rowIndexAttr, 10) - 1;
-        if (!Number.isFinite(rowIndex) || rowIndex < 0) {
-          continue;
-        }
-        while (rows.length <= rowIndex) {
-          rows.push([]);
-        }
-        const rowValues = rows[rowIndex];
-        const cellNodes = rowNode.getElementsByTagName('c');
-        for (let j = 0; j < cellNodes.length; j++) {
-          const cellNode = cellNodes[j];
-          const ref = cellNode.getAttribute('r') || '';
-          const columnIndex = columnLabelToIndex(ref);
-          const value = readCellValue(cellNode, sharedStrings, stylesInfo);
-          const targetIndex = columnIndex != null ? columnIndex : rowValues.length;
-          rowValues[targetIndex] = value;
-          if (targetIndex > maxColumnIndex) {
-            maxColumnIndex = targetIndex;
-          }
-        }
-      }
-
-      const columnCount = maxColumnIndex + 1;
-      if (columnCount === 0 || rows.length === 0) {
-        return [];
-      }
-
-      const normalizedRows = rows.map(function (row) {
-        const arr = new Array(columnCount);
-        for (let col = 0; col < columnCount; col++) {
-          if (!row || typeof row[col] === 'undefined') {
-            arr[col] = '';
-          } else {
-            arr[col] = row[col];
-          }
-        }
-        return arr;
-      });
-
-      const headerRow = normalizedRows[0] || [];
-      const headers = headerRow.map(function (value) {
-        if (value == null) {
-          return '';
-        }
-        if (value instanceof Date) {
-          return formatDateForApi(value);
-        }
-        return String(value).trim();
-      });
-
-      const result = [];
-      for (let rowIndex = 1; rowIndex < normalizedRows.length; rowIndex++) {
-        const row = normalizedRows[rowIndex];
-        if (!row) {
-          continue;
-        }
-        const entry = {};
-        let hasData = false;
-        for (let col = 0; col < headers.length; col++) {
-          const header = headers[col];
-          if (!header) {
-            continue;
-          }
-          const cellValue = row[col];
-          if (cellValue instanceof Date) {
-            entry[header] = cellValue;
-            hasData = true;
-          } else if (cellValue == null || cellValue === '') {
-            entry[header] = '';
-          } else {
-            entry[header] = cellValue;
-            hasData = true;
-          }
-        }
-        if (hasData) {
-          result.push(entry);
-        }
-      }
-      return result;
-    }
-
-    function createZipReader(arrayBuffer) {
-      if (!(arrayBuffer instanceof ArrayBuffer)) {
-        throw new Error('El archivo de Excel no es válido.');
-      }
-      if (typeof global.TextDecoder !== 'function') {
-        throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
-      }
-      if (typeof global.Uint8Array !== 'function') {
-        throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
-      }
-      const data = new Uint8Array(arrayBuffer);
-      const textDecoder = new global.TextDecoder('utf-8');
-
-      function readUint16(offset) {
-        return data[offset] | (data[offset + 1] << 8);
-      }
-
-      function readUint32(offset) {
-        return (
-          data[offset] |
-          (data[offset + 1] << 8) |
-          (data[offset + 2] << 16) |
-          (data[offset + 3] << 24)
-        );
-      }
-
-      let eocdOffset = -1;
-      const minOffset = Math.max(0, data.length - 0xFFFF);
-      for (let i = data.length - 22; i >= minOffset; i--) {
-        if (
-          data[i] === 0x50 &&
-          data[i + 1] === 0x4b &&
-          data[i + 2] === 0x05 &&
-          data[i + 3] === 0x06
-        ) {
-          eocdOffset = i;
-          break;
-        }
-      }
-      if (eocdOffset === -1) {
-        throw new Error('El archivo de Excel está dañado o no se reconoce su formato.');
-      }
-
-      const entryCount = readUint16(eocdOffset + 10);
-      const centralDirectoryOffset = readUint32(eocdOffset + 16);
-
-      const entries = {};
-      let offset = centralDirectoryOffset;
-      for (let i = 0; i < entryCount; i++) {
-        if (
-          data[offset] !== 0x50 ||
-          data[offset + 1] !== 0x4b ||
-          data[offset + 2] !== 0x01 ||
-          data[offset + 3] !== 0x02
-        ) {
-          throw new Error('El archivo de Excel está dañado (directorio central inválido).');
-        }
-        const compressionMethod = readUint16(offset + 10);
-        const compressedSize = readUint32(offset + 20);
-        const fileNameLength = readUint16(offset + 28);
-        const extraLength = readUint16(offset + 30);
-        const commentLength = readUint16(offset + 32);
-        const localHeaderOffset = readUint32(offset + 42);
-        const nameStart = offset + 46;
-        const nameEnd = nameStart + fileNameLength;
-        const rawName = data.slice(nameStart, nameEnd);
-        const fileName = textDecoder.decode(rawName);
-        entries[fileName] = {
-          compressionMethod: compressionMethod,
-          compressedSize: compressedSize,
-          localHeaderOffset: localHeaderOffset
-        };
-        offset = nameEnd + extraLength + commentLength;
-      }
-
-      function getCompressedData(entry) {
-        const localOffset = entry.localHeaderOffset;
-        if (
-          data[localOffset] !== 0x50 ||
-          data[localOffset + 1] !== 0x4b ||
-          data[localOffset + 2] !== 0x03 ||
-          data[localOffset + 3] !== 0x04
-        ) {
-          throw new Error('El archivo de Excel está dañado (cabecera local inválida).');
-        }
-        const fileNameLength = readUint16(localOffset + 26);
-        const extraFieldLength = readUint16(localOffset + 28);
-        const dataStart = localOffset + 30 + fileNameLength + extraFieldLength;
-        const dataEnd = dataStart + entry.compressedSize;
-        return data.slice(dataStart, dataEnd);
-      }
-
-      async function decompressEntry(entry) {
-        const compressed = getCompressedData(entry);
-        if (entry.compressionMethod === 0) {
-          return compressed.buffer.slice(compressed.byteOffset, compressed.byteOffset + compressed.byteLength);
-        }
-        if (entry.compressionMethod === 8) {
-          if (typeof global.DecompressionStream !== 'function' || typeof global.Response !== 'function' || typeof global.Blob !== 'function') {
-            throw new Error('Este navegador no soporta la descompresión de archivos ZIP requerida para leer Excel.');
-          }
-          const stream = new global.Response(
-            new global.Blob([compressed])
-          ).body.pipeThrough(new global.DecompressionStream('deflate-raw'));
-          const buffer = await new global.Response(stream).arrayBuffer();
-          return buffer;
-        }
-        throw new Error('El archivo de Excel usa un método de compresión no soportado.');
-      }
-
-      return {
-        has: function (name) {
-          return Object.prototype.hasOwnProperty.call(entries, name);
-        },
-        readText: async function (name) {
-          if (!Object.prototype.hasOwnProperty.call(entries, name)) {
-            throw new Error(`El archivo de Excel no contiene el recurso "${name}".`);
-          }
-          const buffer = await decompressEntry(entries[name]);
-          return textDecoder.decode(new Uint8Array(buffer));
-        }
-      };
-    }
-
-    async function parseXlsxRows(arrayBuffer) {
-      const zipReader = createZipReader(arrayBuffer);
-      const workbookXml = await zipReader.readText('xl/workbook.xml').catch(function () {
-        throw new Error('El archivo de Excel no contiene la información del libro.');
-      });
-      const workbookDoc = parseXmlDocument(workbookXml);
-      const sheets = workbookDoc.getElementsByTagName('sheet');
-      if (!sheets || sheets.length === 0) {
-        throw new Error('El archivo de Excel no contiene hojas de cálculo.');
-      }
-      const firstSheet = sheets[0];
-      const relId = firstSheet.getAttribute('r:id') || firstSheet.getAttribute('r:Id');
-      if (!relId) {
-        throw new Error('No se pudo determinar la hoja principal del archivo.');
-      }
-      const relsXml = await zipReader.readText('xl/_rels/workbook.xml.rels').catch(function () {
-        throw new Error('El archivo de Excel no contiene la información de relaciones necesaria.');
-      });
-      const relsDoc = parseXmlDocument(relsXml);
-      const relationshipNodes = relsDoc.getElementsByTagName('Relationship');
-      let sheetTarget = '';
-      for (let i = 0; i < relationshipNodes.length; i++) {
-        const rel = relationshipNodes[i];
-        const idAttr = rel.getAttribute('Id');
-        if (idAttr === relId) {
-          sheetTarget = rel.getAttribute('Target') || '';
-          break;
-        }
-      }
-      if (!sheetTarget) {
-        throw new Error('No se encontró la hoja principal del archivo.');
-      }
-      const sheetPath = resolveSheetPath(sheetTarget);
-      const sheetXml = await zipReader.readText(sheetPath).catch(function () {
-        throw new Error('No se pudo leer la hoja principal del archivo.');
-      });
-
-      let sharedStrings = [];
-      if (zipReader.has('xl/sharedStrings.xml')) {
-        const sharedXml = await zipReader.readText('xl/sharedStrings.xml');
-        sharedStrings = parseSharedStringsXml(sharedXml);
-      }
-
-      let stylesInfo = null;
-      if (zipReader.has('xl/styles.xml')) {
-        const stylesXml = await zipReader.readText('xl/styles.xml');
-        stylesInfo = parseStylesXml(stylesXml);
-      }
-
-      return extractSheetRows(sheetXml, sharedStrings, stylesInfo);
-    }
-
-    function readExcelFile(file) {
-      return new Promise(function (resolve, reject) {
-        if (!file) {
-          reject(new Error('Selecciona un archivo de Excel para continuar.'));
-          return;
-        }
-        const reader = new global.FileReader();
-        reader.onerror = function () {
-          reject(new Error('No se pudo leer el archivo seleccionado.'));
-        };
-        reader.onload = function (event) {
-          try {
-            const result = event && event.target ? event.target.result : null;
-            if (!(result instanceof ArrayBuffer)) {
-              throw new Error('El archivo de Excel no se pudo interpretar.');
-            }
-            parseXlsxRows(result).then(resolve).catch(function (err) {
-              reject(err instanceof Error ? err : new Error('No se pudo procesar el archivo de Excel.'));
-            });
-          } catch (err) {
-            reject(err instanceof Error ? err : new Error('No se pudo procesar el archivo de Excel.'));
-          }
-        };
-        reader.readAsArrayBuffer(file);
-      });
-    }
-
-    function prepareBulkRows(rawRows) {
-      const issues = [];
-      const prepared = [];
-      if (!Array.isArray(rawRows) || rawRows.length === 0) {
-        return { rows: [], issues: ['El archivo no contiene filas con datos.'] };
-      }
-
-      const headerSet = new Set();
-      rawRows.forEach(function (row) {
-        if (!row || typeof row !== 'object') {
-          return;
-        }
-        Object.keys(row).forEach(function (key) {
-          const canonical = normalizeBulkHeader(key);
-          if (canonical) {
-            headerSet.add(canonical);
-          }
-        });
-      });
-
-      const missingHeaders = BULK_REQUIRED_HEADERS.filter(function (label) {
-        return !headerSet.has(label);
-      });
-      if (missingHeaders.length > 0) {
-        return {
-          rows: [],
-          issues: [`Faltan las columnas obligatorias: ${missingHeaders.join(', ')}.`]
-        };
-      }
-
-      rawRows.forEach(function (row, index) {
-        if (!row || typeof row !== 'object') {
-          return;
-        }
-
-        const normalizedValues = {};
-        let hasAnyValue = false;
-        Object.keys(row).forEach(function (key) {
-          const canonical = normalizeBulkHeader(key);
-          if (!canonical) {
-            return;
-          }
-          const value = row[key];
-          if (value instanceof Date && !isNaN(value.getTime())) {
-            hasAnyValue = true;
-          } else if (value != null && String(value).trim() !== '') {
-            hasAnyValue = true;
-          }
-          normalizedValues[canonical] = value;
-        });
-
-        if (!hasAnyValue) {
-          return;
-        }
-
-        const rowNumber = index + 2;
-        const rowIssues = [];
-        const output = {};
-
-        const rawTrip = normalizedValues.Trip;
-        const tripValue = rawTrip == null ? '' : String(rawTrip).trim();
-        if (!tripValue) {
-          rowIssues.push('Trip vacío');
-        } else if (!/^\d+$/.test(tripValue)) {
-          rowIssues.push('Trip inválido');
-        } else if (Number(tripValue) < 225000) {
-          rowIssues.push('Trip menor a 225000');
-        }
-        output.Trip = tripValue;
-
-        const rawEjecutivo = normalizedValues.Ejecutivo;
-        const ejecutivoValue = rawEjecutivo == null ? '' : String(rawEjecutivo).trim();
-        if (!ejecutivoValue) {
-          rowIssues.push('Ejecutivo vacío');
-        }
-        output.Ejecutivo = ejecutivoValue;
-
-        ['Caja', 'Estatus', 'Cliente', 'Destino', 'Referencia', 'Segmento'].forEach(function (label) {
-          const rawValue = normalizedValues[label];
-          const value = rawValue == null ? '' : String(rawValue).trim();
-          output[label] = value;
-        });
-
-        BULK_DATE_HEADER_SET.forEach(function (label) {
-          const conversion = convertBulkDateValue(normalizedValues[label]);
-          if (conversion.error) {
-            rowIssues.push(`${label}: ${conversion.error}`);
-          }
-          output[label] = conversion.value;
-        });
-
-        if (rowIssues.length === 0) {
-          prepared.push(output);
-        } else {
-          issues.push(`Fila ${rowNumber}: ${rowIssues.join(', ')}.`);
-        }
-      });
-
-      return { rows: prepared, issues: issues };
-    }
 
     function setStatus(message, type) {
       const el = refs.status;
@@ -3770,7 +3591,8 @@
   const exportsObject = {
     fmtDate: fmtDate,
     DEFAULT_LOCALE: DEFAULT_LOCALE,
-    formatHeaderLabel: formatHeaderLabel
+    formatHeaderLabel: formatHeaderLabel,
+    prepareBulkRows: prepareBulkRows
   };
 
   if (typeof module !== 'undefined' && module.exports) {
