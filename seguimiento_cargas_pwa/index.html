@@ -148,7 +148,8 @@
         <h2 id="editTitle" data-edit-title>Editar registro</h2>
       </div>
       <div class="edit-modal__content">
-        <div class="edit-modal__grid">
+        <div class="edit-modal__scroll">
+          <div class="edit-modal__grid">
         <div class="form-field">
           <label for="editTrip">Trip</label>
           <input id="editTrip" name="trip" type="number" inputmode="numeric" min="225000" step="1" required />
@@ -216,6 +217,8 @@
         <div class="form-field form-field--full">
           <label for="editTracking">Tracking</label>
           <input id="editTracking" name="tracking" type="text" />
+        </div>
+          </div>
         </div>
         <p class="edit-modal__error" data-edit-error aria-live="assertive"></p>
       </div>
