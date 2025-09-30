@@ -498,6 +498,8 @@ body {
   flex-wrap: wrap;
   justify-content: flex-start;
   backdrop-filter: var(--frosted-filter);
+  position: relative;
+  z-index: 5;
 }
 
 .filter-card {
