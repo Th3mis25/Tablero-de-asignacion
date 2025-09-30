@@ -2243,6 +2243,24 @@
       wasStatusPopoverOpen = state.isStatusPopoverOpen;
     }
 
+    function getCellDisplayValue(cell) {
+      if (cell instanceof Date) {
+        return cell;
+      }
+      if (cell && typeof cell === 'object' && !Array.isArray(cell)) {
+        if (Object.prototype.hasOwnProperty.call(cell, 'value')) {
+          return getCellDisplayValue(cell.value);
+        }
+        if (Object.prototype.hasOwnProperty.call(cell, 'text')) {
+          return getCellDisplayValue(cell.text);
+        }
+        if (Object.prototype.hasOwnProperty.call(cell, 'displayValue')) {
+          return getCellDisplayValue(cell.displayValue);
+        }
+      }
+      return cell;
+    }
+
     function openStatusPopover() {
       if (state.isStatusPopoverOpen || state.availableStatuses.length === 0) {
         return;
@@ -2929,7 +2947,9 @@
           const td = doc.createElement('td');
           const headerLabel = headers[c];
           const columnKey = c < columnKeys.length ? columnKeys[c] : null;
-          let value = row && row[c] != null ? row[c] : '';
+          const rawCell = row && row[c] != null ? row[c] : '';
+          const cellValue = getCellDisplayValue(rawCell);
+          let value = cellValue != null ? cellValue : '';
           const isTripColumn = columnKey === 'trip';
           const isTrackingColumn = columnKey === 'tracking';
           const isStatusColumn = columnKey === 'estatus';
