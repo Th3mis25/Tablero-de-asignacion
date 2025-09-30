@@ -208,7 +208,7 @@ body {
 }
 
 .sheet-app {
-  width: min(1500px, 98vw);
+  width: min(100%, 100vw);
   margin: 0 auto;
   padding: clamp(var(--size-24), 3vh, var(--size-40))
     clamp(var(--size-16), 2.5vw, var(--size-32))
