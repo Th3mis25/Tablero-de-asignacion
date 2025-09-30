@@ -145,8 +145,8 @@
   <section class="edit-modal hidden" data-edit-modal aria-modal="true" role="dialog" aria-labelledby="editTitle">
     <form class="edit-modal__form" data-edit-form novalidate>
       <h2 id="editTitle" data-edit-title>Editar registro</h2>
-      <p class="edit-modal__hint" data-edit-hint>Actualiza la información del viaje y guarda los cambios.</p>
-      <div class="edit-modal__grid">
+      <div class="edit-modal__content">
+        <div class="edit-modal__grid">
         <div class="form-field">
           <label for="editTrip">Trip</label>
           <input id="editTrip" name="trip" type="number" inputmode="numeric" min="225000" step="1" required />
@@ -205,7 +205,7 @@
         </div>
         <div class="form-field form-field--full">
           <label for="editComentarios">Comentarios</label>
-          <textarea id="editComentarios" name="comentarios" rows="3"></textarea>
+          <input id="editComentarios" name="comentarios" type="text" />
         </div>
         <div class="form-field form-field--full">
           <label for="editDocs">Docs</label>
@@ -215,11 +215,11 @@
           <label for="editTracking">Tracking</label>
           <input id="editTracking" name="tracking" type="text" />
         </div>
+        <p class="edit-modal__error" data-edit-error aria-live="assertive"></p>
       </div>
-      <p class="edit-modal__error" data-edit-error aria-live="assertive"></p>
       <div class="edit-modal__actions">
         <button type="button" class="button button--secondary" data-action="cancel-edit">Cancelar</button>
-        <button type="submit" class="button button--primary" data-edit-submit>Guardar cambios</button>
+        <button type="submit" class="button button--primary" data-edit-submit>Guardar</button>
       </div>
     </form>
   </section>

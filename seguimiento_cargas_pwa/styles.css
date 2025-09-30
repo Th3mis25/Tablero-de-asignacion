@@ -1123,11 +1123,12 @@ body {
   backdrop-filter: var(--frosted-filter);
   width: min(var(--size-420), calc(100% - var(--size-48)));
   max-height: calc(100vh - var(--size-80));
-  overflow-y: auto;
   transition: opacity var(--transition), transform var(--transition);
   opacity: 0;
   pointer-events: none;
   z-index: 1001;
+  overflow: hidden;
+  display: flex;
 }
 
 .edit-modal {
@@ -1138,6 +1139,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--size-16);
+  height: 100%;
+  width: 100%;
 }
 
 .login-modal__form h2,
@@ -1212,12 +1215,26 @@ body {
   font-size: 0.9rem;
 }
 
+.edit-modal__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-16);
+  overflow-y: auto;
+  padding-right: var(--size-4);
+}
+
 .login-modal__actions,
 .edit-modal__actions {
   margin-top: var(--size-24);
   display: flex;
   justify-content: flex-end;
   gap: var(--size-12);
+}
+
+.edit-modal__actions {
+  padding-top: var(--size-16);
+  border-top: var(--size-1) solid var(--sheet-border);
+  background: var(--modal-surface);
 }
 
 .edit-modal__grid {
