@@ -971,7 +971,7 @@ body [style*='font-weight:900'] {
   color: var(--table-header-text);
   text-transform: none !important;
   letter-spacing: normal !important;
-  font-size: 0.64rem;
+  font-size: 0.745rem;
   border-bottom: var(--size-1) solid var(--table-header-border);
   box-shadow: inset 0 -var(--size-1) 0 var(--table-header-border);
   z-index: 2;
