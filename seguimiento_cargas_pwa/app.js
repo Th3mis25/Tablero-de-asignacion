@@ -2097,9 +2097,21 @@
         'Tracking (link): ' + tracking
       ].join('\n');
       const whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
-      const openedWindow = typeof global.open === 'function'
-        ? global.open(whatsappUrl, '_blank', 'noopener,noreferrer')
-        : null;
+      let openedWindow = null;
+      if (typeof global.open === 'function') {
+        try {
+          openedWindow = global.open(whatsappUrl, '_blank');
+          if (openedWindow && typeof openedWindow === 'object') {
+            try {
+              openedWindow.opener = null;
+            } catch (err) {
+              // Ignora errores de acceso entre ventanas (cross-origin).
+            }
+          }
+        } catch (err) {
+          openedWindow = null;
+        }
+      }
       if (!openedWindow) {
         setStatus('No se pudo abrir WhatsApp. Permite las ventanas emergentes e inténtalo de nuevo.', 'error');
       }
