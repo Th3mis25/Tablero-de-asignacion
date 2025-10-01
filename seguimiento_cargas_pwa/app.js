@@ -2055,7 +2055,7 @@
         'Referencia: ' + referencia,
         'Cliente: ' + cliente,
         'TR-MX: ' + trmx,
-        'Tracking (link): ' + tracking
+        'Tracking: ' + tracking
       ].join('\n');
       try {
         await copyTextToClipboard(text);
@@ -2092,7 +2092,7 @@
         'Referencia: ' + referencia,
         'Cliente: ' + cliente,
         trailerLabel + ': ' + trailerValue,
-        'Tracking (link): ' + tracking
+        'Tracking: ' + tracking
       ].join('\n');
       const whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
       let openedWindow = null;
