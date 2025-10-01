@@ -2063,7 +2063,17 @@
       }
     }
 
-    function shareRowInfoToWhatsapp(dataIndex) {
+    function shareRowInfoToWhatsapp(dataIndex, options) {
+      const config = Object.assign({
+        valueKey: 'trusa',
+        label: 'TR-USA'
+      }, options || {});
+      const trailerKey = typeof config.valueKey === 'string' && config.valueKey.trim()
+        ? config.valueKey.trim()
+        : 'trusa';
+      const trailerLabel = typeof config.label === 'string' && config.label.trim()
+        ? config.label.trim()
+        : 'TR-USA';
       const rowData = getRowDataForIndex(dataIndex);
       if (!rowData) {
         setStatus('No fue posible preparar el mensaje para WhatsApp.', 'error');
@@ -2073,13 +2083,13 @@
       const caja = getValueForCopy(values, 'caja');
       const referencia = getValueForCopy(values, 'referencia');
       const cliente = getValueForCopy(values, 'cliente');
-      const trusa = getValueForCopy(values, 'trusa');
+      const trailerValue = getValueForCopy(values, trailerKey);
       const tracking = getValueForCopy(values, 'tracking');
       const message = [
         'Caja: ' + caja,
         'Referencia: ' + referencia,
         'Cliente: ' + cliente,
-        'TR-USA: ' + trusa,
+        trailerLabel + ': ' + trailerValue,
         'Tracking (link): ' + tracking
       ].join('\n');
       const whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
@@ -3267,10 +3277,13 @@
         const actionButton = doc.createElement('button');
         actionButton.type = 'button';
         actionButton.className = 'table-action-button';
-        actionButton.setAttribute('data-action', 'copy-row-info');
+        actionButton.setAttribute('data-action', 'share-row-whatsapp-mx');
         actionButton.setAttribute('data-row-index', String(entry.dataIndex));
-        actionButton.setAttribute('aria-label', 'Copiar datos del registro');
-        actionButton.title = 'Copiar datos';
+        actionButton.setAttribute(
+          'aria-label',
+          'Compartir datos del registro por WhatsApp (MX)'
+        );
+        actionButton.title = 'Compartir por WhatsApp (MX)';
 
         const iconSpan = doc.createElement('span');
         iconSpan.className = 'table-action-button__icon';
@@ -3280,7 +3293,7 @@
 
         const srText = doc.createElement('span');
         srText.className = 'visually-hidden';
-        srText.textContent = 'Copiar datos del registro';
+        srText.textContent = 'Compartir datos del registro por WhatsApp (MX)';
         actionButton.appendChild(srText);
 
         actionsCell.appendChild(actionButton);
@@ -3510,13 +3523,13 @@
       if (!target || typeof target.closest !== 'function') {
         return;
       }
-      const copyTrigger = target.closest('[data-action="copy-row-info"]');
-      if (copyTrigger) {
+      const whatsappMxTrigger = target.closest('[data-action="share-row-whatsapp-mx"]');
+      if (whatsappMxTrigger) {
         event.preventDefault();
-        const rowIndexAttr = copyTrigger.getAttribute('data-row-index');
+        const rowIndexAttr = whatsappMxTrigger.getAttribute('data-row-index');
         const dataIndex = rowIndexAttr == null ? NaN : parseInt(rowIndexAttr, 10);
         if (!Number.isNaN(dataIndex)) {
-          copyRowInfo(dataIndex);
+          shareRowInfoToWhatsapp(dataIndex, { valueKey: 'trmx', label: 'TR-MX' });
         }
         return;
       }
@@ -3526,7 +3539,7 @@
         const rowIndexAttr = whatsappTrigger.getAttribute('data-row-index');
         const dataIndex = rowIndexAttr == null ? NaN : parseInt(rowIndexAttr, 10);
         if (!Number.isNaN(dataIndex)) {
-          shareRowInfoToWhatsapp(dataIndex);
+          shareRowInfoToWhatsapp(dataIndex, { valueKey: 'trusa', label: 'TR-USA' });
         }
         return;
       }
