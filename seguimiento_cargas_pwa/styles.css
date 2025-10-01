@@ -29,6 +29,7 @@
   --size-16: calc(16px * var(--app-scale));
   --size-18: calc(18px * var(--app-scale));
   --size-20: calc(20px * var(--app-scale));
+  --size-28: calc(28px * var(--app-scale));
   --size-24: calc(24px * var(--app-scale));
   --size-32: calc(32px * var(--app-scale));
   --size-40: calc(40px * var(--app-scale));
