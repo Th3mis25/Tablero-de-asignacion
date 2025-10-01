@@ -2920,6 +2920,7 @@
       state.tableScale = 1;
       if (refs.tableZoom) {
         refs.tableZoom.style.removeProperty('--table-scale');
+        refs.tableZoom.style.removeProperty('width');
       }
       if (refs.tableViewport) {
         refs.tableViewport.classList.remove('is-zoomed');
@@ -2937,22 +2938,27 @@
 
       const viewportWidth = refs.tableViewport.clientWidth;
       const tableWidth = refs.tableElement.scrollWidth;
+      const headWidth = refs.tableHead ? refs.tableHead.scrollWidth : 0;
+      const bodyWidth = refs.tableBody ? refs.tableBody.scrollWidth : 0;
+      const maxTableWidth = Math.max(tableWidth, headWidth, bodyWidth);
 
-      if (!(viewportWidth > 0 && tableWidth > 0)) {
+      if (!(viewportWidth > 0 && maxTableWidth > 0)) {
         resetTableZoom();
         return;
       }
 
-      const scale = Math.min(1, viewportWidth / tableWidth);
+      const scale = Math.min(1, viewportWidth / maxTableWidth);
 
       if (scale < 1) {
         refs.tableZoom.style.setProperty('--table-scale', String(scale));
+        refs.tableZoom.style.width = maxTableWidth + 'px';
         state.tableScale = scale;
         refs.tableViewport.classList.add('is-zoomed');
       } else if (state.tableScale !== 1) {
         resetTableZoom();
       } else {
         refs.tableViewport.classList.remove('is-zoomed');
+        refs.tableZoom.style.removeProperty('width');
       }
     }
 
