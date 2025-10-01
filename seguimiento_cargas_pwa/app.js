@@ -2104,6 +2104,32 @@
       return String(value).trim();
     }
 
+    const STATUS_BADGE_ICON_LABELS = {
+      default: 'Indicador visual del estado',
+      live: 'Seguimiento activo',
+      drop: 'Entrega en patio',
+      'live-drop': 'Seguimiento activo con entrega en patio',
+      loading: 'Proceso en curso',
+      'qro-yard': 'Patio logístico',
+      'mty-yard': 'Patio logístico',
+      'mieleras-yard': 'Patio logístico',
+      'nuevo-laredo-yard': 'Patio logístico',
+      'in-transit-mx': 'Unidad en tránsito',
+      'in-transit-usa': 'Unidad en tránsito',
+      'at-destination': 'Entrega completada',
+      delivered: 'Entrega completada',
+      'en-transito': 'Unidad en tránsito',
+      entregado: 'Entrega completada',
+      pendiente: 'Pendiente de confirmación',
+      'en-espera': 'Pendiente de confirmación',
+      pending: 'Pendiente de confirmación',
+      cancelled: 'Carga cancelada',
+      cancelado: 'Carga cancelada',
+      cancelada: 'Carga cancelada',
+      demorado: 'Carga con retraso',
+      retrasado: 'Carga con retraso'
+    };
+
     function getStatusBadgeSlug(value) {
       const normalized = normalizeStatusValue(value);
       if (!normalized) {
@@ -3021,7 +3047,24 @@
               if (slug) {
                 badge.classList.add('status-badge--' + slug);
               }
-              badge.textContent = normalizedStatus;
+
+              const icon = doc.createElement('span');
+              icon.className = 'status-badge__icon';
+              icon.setAttribute('aria-hidden', 'true');
+              badge.appendChild(icon);
+
+              const iconLabel = STATUS_BADGE_ICON_LABELS[slug] || STATUS_BADGE_ICON_LABELS.default;
+              if (iconLabel) {
+                const srIconLabel = doc.createElement('span');
+                srIconLabel.className = 'visually-hidden';
+                srIconLabel.textContent = iconLabel;
+                badge.appendChild(srIconLabel);
+              }
+
+              const text = doc.createElement('span');
+              text.className = 'status-badge__text';
+              text.textContent = normalizedStatus;
+              badge.appendChild(text);
               td.appendChild(badge);
             } else {
               td.classList.add('is-empty');
