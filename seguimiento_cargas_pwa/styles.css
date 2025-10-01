@@ -1062,12 +1062,12 @@ h6 {
 }
 
 .sheet-table.sheet-table tbody td * {
-  font-weight: 300 !important;
+  font-weight: 200 !important;
 }
 
 .sheet-table tbody td .table-link-button,
 .sheet-table tbody td .status-badge {
-  font-weight: 300;
+  font-weight: 200;
 }
 
 .sheet-table thead th {
@@ -1085,10 +1085,9 @@ h6 {
   backdrop-filter: blur(var(--size-4));
 }
 
-.sheet-table.sheet-table thead th,
 .sheet-table.sheet-table tbody th,
 .sheet-table.sheet-table tbody td {
-  font-weight: 300 !important;
+  font-weight: 200 !important;
 }
 
 .sheet-table tbody tr:nth-child(even) td {
