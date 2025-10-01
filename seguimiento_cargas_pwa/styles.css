@@ -1,3 +1,19 @@
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("./fonts/SF-Pro-Display-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "SF Pro Display";
+  src: url("./fonts/SF-Pro-Display-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   color-scheme: light;
   --app-scale: 1;
@@ -186,8 +202,6 @@ html,
 body {
   margin: 0;
   padding: 0;
-  font-family: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", "Helvetica Neue", sans-serif;
   background: var(--sheet-background);
   color: var(--sheet-text);
   line-height: 1.45;
@@ -198,6 +212,8 @@ html {
 }
 
 body {
+  font-family: "SF Pro Display", system-ui, sans-serif;
+  font-weight: 400;
   min-height: 100vh;
   display: flex;
   justify-content: center;
@@ -205,29 +221,6 @@ body {
   padding: clamp(var(--size-12), 2vh, var(--size-24));
   background-attachment: fixed;
   background-size: cover;
-}
-
-body,
-body * {
-  font-weight: 400;
-}
-
-body b,
-body strong,
-body .bold,
-body .fw-bold,
-body [data-text-type='bold'],
-body [style*='font-weight: bold'],
-body [style*='font-weight:bold'],
-body [style*='font-weight: 600'],
-body [style*='font-weight:600'],
-body [style*='font-weight: 700'],
-body [style*='font-weight:700'],
-body [style*='font-weight: 800'],
-body [style*='font-weight:800'],
-body [style*='font-weight: 900'],
-body [style*='font-weight:900'] {
-  font-weight: 400 !important;
 }
 
 .sheet-app {
