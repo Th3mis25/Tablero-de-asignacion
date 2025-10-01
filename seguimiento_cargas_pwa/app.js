@@ -1752,6 +1752,9 @@
     const refs = {
       tableHead: doc.querySelector('[data-table-head]'),
       tableBody: doc.querySelector('[data-table-body]'),
+      tableViewport: doc.querySelector('[data-table-viewport]'),
+      tableZoom: doc.querySelector('[data-table-zoom]'),
+      tableElement: doc.querySelector('[data-table]'),
       loadingIndicator: doc.querySelector('[data-loading-indicator]'),
       viewMenu: doc.querySelector('[data-view-menu]'),
       status: doc.querySelector('[data-status]'),
@@ -1818,6 +1821,7 @@
       editingRecord: null,
       currentViewId: TABLE_VIEWS[0] ? TABLE_VIEWS[0].id : 'all',
       theme: initialTheme,
+      tableScale: 1,
       filters: {
         searchText: '',
         dateRange: null,
@@ -2898,9 +2902,83 @@
       }
     }
 
+    let pendingTableZoomFrame = null;
+    let pendingTableZoomIsTimeout = false;
+
+    function resetTableZoom() {
+      if (pendingTableZoomFrame != null) {
+        if (pendingTableZoomIsTimeout) {
+          global.clearTimeout(pendingTableZoomFrame);
+        } else if (typeof global.cancelAnimationFrame === 'function') {
+          global.cancelAnimationFrame(pendingTableZoomFrame);
+        }
+        pendingTableZoomFrame = null;
+        pendingTableZoomIsTimeout = false;
+      }
+      state.tableScale = 1;
+      if (refs.tableZoom) {
+        refs.tableZoom.style.removeProperty('--table-scale');
+      }
+      if (refs.tableViewport) {
+        refs.tableViewport.classList.remove('is-zoomed');
+      }
+    }
+
+    function applyTableZoom() {
+      if (!refs.tableViewport || !refs.tableZoom || !refs.tableElement) {
+        return;
+      }
+
+      if (!refs.tableViewport.isConnected || !refs.tableZoom.isConnected || !refs.tableElement.isConnected) {
+        return;
+      }
+
+      const viewportWidth = refs.tableViewport.clientWidth;
+      const tableWidth = refs.tableElement.scrollWidth;
+
+      if (!(viewportWidth > 0 && tableWidth > 0)) {
+        resetTableZoom();
+        return;
+      }
+
+      const scale = Math.min(1, viewportWidth / tableWidth);
+
+      if (scale < 1) {
+        refs.tableZoom.style.setProperty('--table-scale', String(scale));
+        state.tableScale = scale;
+        refs.tableViewport.classList.add('is-zoomed');
+      } else if (state.tableScale !== 1) {
+        resetTableZoom();
+      } else {
+        refs.tableViewport.classList.remove('is-zoomed');
+      }
+    }
+
+    function scheduleTableZoomUpdate() {
+      if (pendingTableZoomFrame != null) {
+        return;
+      }
+      const raf = typeof global.requestAnimationFrame === 'function' ? global.requestAnimationFrame : null;
+      if (raf) {
+        pendingTableZoomIsTimeout = false;
+        pendingTableZoomFrame = raf(function () {
+          pendingTableZoomFrame = null;
+          applyTableZoom();
+        });
+      } else {
+        pendingTableZoomIsTimeout = true;
+        pendingTableZoomFrame = global.setTimeout(function () {
+          pendingTableZoomFrame = null;
+          pendingTableZoomIsTimeout = false;
+          applyTableZoom();
+        }, 16);
+      }
+    }
+
     function clearTable() {
       if (refs.tableHead) refs.tableHead.innerHTML = '';
       if (refs.tableBody) refs.tableBody.innerHTML = '';
+      resetTableZoom();
     }
 
     function renderTable() {
@@ -3345,6 +3423,8 @@
       } else {
         setStatus('Sincronizado', 'success');
       }
+
+      scheduleTableZoomUpdate();
     }
 
     function getRowDataForIndex(dataIndex) {
@@ -3822,6 +3902,25 @@
       }
 
       showLoginModal();
+    }
+
+    if (refs.tableViewport || refs.tableElement) {
+      scheduleTableZoomUpdate();
+    }
+
+    if (typeof global.ResizeObserver === 'function' && (refs.tableElement || refs.tableViewport)) {
+      const resizeObserver = new global.ResizeObserver(function () {
+        scheduleTableZoomUpdate();
+      });
+      if (refs.tableElement) {
+        resizeObserver.observe(refs.tableElement);
+      }
+      if (refs.tableViewport) {
+        resizeObserver.observe(refs.tableViewport);
+      }
+    } else if (typeof global.addEventListener === 'function') {
+      global.addEventListener('resize', scheduleTableZoomUpdate);
+      global.addEventListener('orientationchange', scheduleTableZoomUpdate);
     }
 
     if (refs.loginForm) {

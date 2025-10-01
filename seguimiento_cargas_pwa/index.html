@@ -123,12 +123,20 @@
           </div>
         </div>
       </div>
-      <div class="sheet-grid__viewport" role="region" aria-live="polite" aria-label="Tabla de seguimiento">
+      <div
+        class="sheet-grid__viewport"
+        role="region"
+        aria-live="polite"
+        aria-label="Tabla de seguimiento"
+        data-table-viewport
+      >
         <div class="loading-overlay" data-loading-indicator hidden></div>
-        <table class="sheet-table">
-          <thead data-table-head></thead>
-          <tbody data-table-body></tbody>
-        </table>
+        <div class="sheet-grid__table-zoom" data-table-zoom>
+          <table class="sheet-table" data-table>
+            <thead data-table-head></thead>
+            <tbody data-table-body></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
