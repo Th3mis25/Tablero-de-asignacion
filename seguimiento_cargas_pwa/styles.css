@@ -992,7 +992,7 @@ h6 {
 .sheet-table tbody td,
 .sheet-table tbody th {
   border: none;
-  padding: var(--size-14) var(--size-12);
+  padding: var(--size-16) var(--size-12);
   line-height: 1.45;
   white-space: normal;
   background: var(--sheet-surface);
@@ -1001,6 +1001,13 @@ h6 {
 .sheet-table tbody td {
   transition: background var(--transition), box-shadow var(--transition);
   white-space: nowrap;
+  font-weight: 400;
+  color: var(--sheet-text);
+  border-bottom: 1px solid rgba(60, 60, 67, 0.12);
+}
+
+.sheet-table tbody th {
+  border-bottom: 1px solid rgba(60, 60, 67, 0.12);
 }
 
 .sheet-table thead th.table-actions-column {
@@ -1063,10 +1070,6 @@ h6 {
   object-fit: contain;
 }
 
-.sheet-table.sheet-table tbody td * {
-  font-weight: 100 !important;
-}
-
 .sheet-table tbody td .table-link-button,
 .sheet-table tbody td .status-badge {
   font-weight: 100;
@@ -1078,22 +1081,13 @@ h6 {
   background: var(--table-header-bg);
   color: var(--table-header-text);
   text-transform: none !important;
-  letter-spacing: normal !important;
+  letter-spacing: 0.01em;
   font-size: var(--font-size-sm);
-  font-weight: 300;
+  font-weight: 600;
   border-bottom: var(--size-1) solid var(--table-header-border);
   box-shadow: inset 0 -var(--size-1) 0 var(--table-header-border);
   z-index: 2;
   backdrop-filter: blur(var(--size-4));
-}
-
-.sheet-table.sheet-table tbody th,
-.sheet-table.sheet-table tbody td {
-  font-weight: 100 !important;
-}
-
-.sheet-table tbody tr:nth-child(even) td {
-  background: var(--sheet-surface-muted);
 }
 
 .sheet-table tbody tr:hover td {
