@@ -1,18 +1,4 @@
-@font-face {
-  font-family: "SF Pro Display";
-  src: url("./fonts/SF-Pro-Display-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "SF Pro Display";
-  src: url("./fonts/SF-Pro-Display-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap");
 
 :root {
   color-scheme: light;
@@ -217,7 +203,8 @@ html {
 }
 
 body {
-  font-family: "SF Pro Display", system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
   font-weight: 400;
   font-size: var(--font-size-sm);
   min-height: 100vh;
@@ -227,6 +214,21 @@ body {
   padding: clamp(var(--size-12), 2vh, var(--size-24));
   background-attachment: fixed;
   background-size: cover;
+}
+
+th,
+td,
+button,
+input,
+select,
+textarea,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: inherit;
 }
 
 .sheet-app {
