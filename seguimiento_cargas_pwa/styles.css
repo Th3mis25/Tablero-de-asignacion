@@ -1001,6 +1001,10 @@ body [style*='font-weight:900'] {
   font-weight: 400 !important;
 }
 
+.sheet-table tbody td * {
+  font-weight: 400 !important;
+}
+
 .sheet-table tbody td .table-link-button,
 .sheet-table tbody td .status-badge {
   font-weight: 300;
