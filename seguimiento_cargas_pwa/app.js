@@ -2928,38 +2928,7 @@
     }
 
     function applyTableZoom() {
-      if (!refs.tableViewport || !refs.tableZoom || !refs.tableElement) {
-        return;
-      }
-
-      if (!refs.tableViewport.isConnected || !refs.tableZoom.isConnected || !refs.tableElement.isConnected) {
-        return;
-      }
-
-      const viewportWidth = refs.tableViewport.clientWidth;
-      const tableWidth = refs.tableElement.scrollWidth;
-      const headWidth = refs.tableHead ? refs.tableHead.scrollWidth : 0;
-      const bodyWidth = refs.tableBody ? refs.tableBody.scrollWidth : 0;
-      const maxTableWidth = Math.max(tableWidth, headWidth, bodyWidth);
-
-      if (!(viewportWidth > 0 && maxTableWidth > 0)) {
-        resetTableZoom();
-        return;
-      }
-
-      const scale = Math.min(1, viewportWidth / maxTableWidth);
-
-      if (scale < 1) {
-        refs.tableZoom.style.setProperty('--table-scale', String(scale));
-        refs.tableZoom.style.width = maxTableWidth + 'px';
-        state.tableScale = scale;
-        refs.tableViewport.classList.add('is-zoomed');
-      } else if (state.tableScale !== 1) {
-        resetTableZoom();
-      } else {
-        refs.tableViewport.classList.remove('is-zoomed');
-        refs.tableZoom.style.removeProperty('width');
-      }
+      resetTableZoom();
     }
 
     function scheduleTableZoomUpdate() {
