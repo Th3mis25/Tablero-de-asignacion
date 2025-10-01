@@ -991,7 +991,6 @@ body {
 .sheet-table tbody td {
   transition: background var(--transition), box-shadow var(--transition);
   white-space: nowrap;
-  font-weight: 400 !important;
 }
 
 .sheet-table thead th.table-actions-column {
@@ -1054,7 +1053,7 @@ body {
   object-fit: contain;
 }
 
-.sheet-table tbody td * {
+.sheet-table.sheet-table tbody td * {
   font-weight: 400 !important;
 }
 
@@ -1067,7 +1066,6 @@ body {
   position: sticky;
   top: 0;
   background: var(--table-header-bg);
-  font-weight: 400 !important;
   color: var(--table-header-text);
   text-transform: none !important;
   letter-spacing: normal !important;
@@ -1076,6 +1074,12 @@ body {
   box-shadow: inset 0 -var(--size-1) 0 var(--table-header-border);
   z-index: 2;
   backdrop-filter: blur(var(--size-4));
+}
+
+.sheet-table.sheet-table thead th,
+.sheet-table.sheet-table tbody th,
+.sheet-table.sheet-table tbody td {
+  font-weight: 400 !important;
 }
 
 .sheet-table tbody tr:nth-child(even) td {
@@ -1629,8 +1633,4 @@ body {
   .sheet-app__controls .button {
     width: 100%;
   }
-}
-
-th, td {
-  font-weight: 400 !important;
 }
