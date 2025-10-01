@@ -3288,7 +3288,13 @@
         const iconSpan = doc.createElement('span');
         iconSpan.className = 'table-action-button__icon';
         iconSpan.setAttribute('aria-hidden', 'true');
-        iconSpan.textContent = '🇲🇽';
+
+        const mexicoIconImage = doc.createElement('img');
+        mexicoIconImage.src = 'assets/Mexico.png';
+        mexicoIconImage.alt = '';
+        mexicoIconImage.className = 'table-action-button__icon-image';
+        iconSpan.appendChild(mexicoIconImage);
+
         actionButton.appendChild(iconSpan);
 
         const srText = doc.createElement('span');
