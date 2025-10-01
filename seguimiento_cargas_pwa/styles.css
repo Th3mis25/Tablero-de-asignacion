@@ -936,18 +936,6 @@ h6 {
   position: relative;
 }
 
-.sheet-grid__viewport.is-zoomed {
-  padding-bottom: var(--size-8);
-}
-
-.sheet-grid__table-zoom {
-  --table-scale: 1;
-  transform-origin: top left;
-  transform: scale(var(--table-scale));
-  display: inline-block;
-  vertical-align: top;
-}
-
 [data-loading-indicator] {
   position: absolute;
   inset: 0;
