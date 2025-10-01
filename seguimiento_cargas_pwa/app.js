@@ -1791,7 +1791,8 @@
       cancelEditButton: doc.querySelector('[data-action="cancel-edit"]'),
       editTitle: doc.querySelector('[data-edit-title]'),
       editHint: doc.querySelector('[data-edit-hint]'),
-      editSubmitButton: doc.querySelector('[data-edit-submit]')
+      editSubmitButton: doc.querySelector('[data-edit-submit]'),
+      copyToast: doc.querySelector('[data-copy-toast]')
     };
 
     const rawStoredTheme = getStoredValue(STORAGE_THEME_KEY);
@@ -1826,6 +1827,9 @@
       isDatePopoverOpen: false,
       isStatusPopoverOpen: false
     };
+
+    let copyToastTimeoutId = null;
+    let copyToastHideTimeoutId = null;
 
     function setTheme(theme, options) {
       const normalized = theme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
@@ -1909,6 +1913,154 @@
       el.hidden = false;
       el.textContent = message;
       el.title = message;
+    }
+
+    function hideCopyToast() {
+      if (!refs.copyToast) {
+        return;
+      }
+      refs.copyToast.classList.remove('is-visible');
+      if (copyToastHideTimeoutId) {
+        global.clearTimeout(copyToastHideTimeoutId);
+      }
+      copyToastHideTimeoutId = global.setTimeout(function () {
+        if (refs.copyToast) {
+          refs.copyToast.hidden = true;
+        }
+        copyToastHideTimeoutId = null;
+      }, 200);
+    }
+
+    function showCopyToast(message) {
+      if (!refs.copyToast) {
+        return;
+      }
+      if (copyToastTimeoutId) {
+        global.clearTimeout(copyToastTimeoutId);
+        copyToastTimeoutId = null;
+      }
+      if (copyToastHideTimeoutId) {
+        global.clearTimeout(copyToastHideTimeoutId);
+        copyToastHideTimeoutId = null;
+      }
+      refs.copyToast.textContent = message || '';
+      refs.copyToast.hidden = false;
+      refs.copyToast.classList.add('is-visible');
+      copyToastTimeoutId = global.setTimeout(function () {
+        hideCopyToast();
+        copyToastTimeoutId = null;
+      }, 2000);
+    }
+
+    function copyTextToClipboard(text) {
+      const normalized = typeof text === 'string' ? text : text == null ? '' : String(text);
+      if (global.navigator && global.navigator.clipboard &&
+        typeof global.navigator.clipboard.writeText === 'function') {
+        return global.navigator.clipboard.writeText(normalized);
+      }
+      return new Promise(function (resolve, reject) {
+        if (!doc || !doc.body) {
+          reject(new Error('No hay acceso al portapapeles.'));
+          return;
+        }
+        const textarea = doc.createElement('textarea');
+        textarea.value = normalized;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        textarea.style.top = '-9999px';
+        textarea.style.left = '-9999px';
+        doc.body.appendChild(textarea);
+        const activeElement = doc.activeElement;
+        textarea.focus();
+        textarea.select();
+        let succeeded = false;
+        try {
+          succeeded = typeof doc.execCommand === 'function' ? doc.execCommand('copy') : false;
+        } catch (err) {
+          doc.body.removeChild(textarea);
+          reject(err instanceof Error ? err : new Error('No se pudo copiar.'));
+          return;
+        }
+        doc.body.removeChild(textarea);
+        if (activeElement && typeof activeElement.focus === 'function') {
+          activeElement.focus();
+        }
+        if (typeof doc.getSelection === 'function') {
+          const selection = doc.getSelection();
+          if (selection && typeof selection.removeAllRanges === 'function') {
+            selection.removeAllRanges();
+          }
+        }
+        if (succeeded) {
+          resolve();
+        } else {
+          reject(new Error('No se pudo copiar.'));
+        }
+      });
+    }
+
+    function getValueForCopy(values, key) {
+      if (!values || !Object.prototype.hasOwnProperty.call(values, key)) {
+        return '';
+      }
+      const raw = values[key];
+      if (raw == null) {
+        return '';
+      }
+      if (raw instanceof Date) {
+        return fmtDate(raw, state.locale);
+      }
+      const displayValue = getCellDisplayValue(raw);
+      if (displayValue == null) {
+        return '';
+      }
+      if (displayValue instanceof Date) {
+        return fmtDate(displayValue, state.locale);
+      }
+      if (displayValue && typeof displayValue === 'object') {
+        if (Object.prototype.hasOwnProperty.call(displayValue, 'url')) {
+          return String(displayValue.url);
+        }
+        if (Object.prototype.hasOwnProperty.call(displayValue, 'hyperlink')) {
+          return String(displayValue.hyperlink);
+        }
+        if (Object.prototype.hasOwnProperty.call(displayValue, 'text')) {
+          return String(displayValue.text);
+        }
+        if (Object.prototype.hasOwnProperty.call(displayValue, 'value')) {
+          return String(displayValue.value);
+        }
+      }
+      return String(displayValue).trim();
+    }
+
+    async function copyRowInfo(dataIndex) {
+      const rowData = getRowDataForIndex(dataIndex);
+      if (!rowData) {
+        setStatus('No fue posible copiar la información del registro.', 'error');
+        return;
+      }
+      const values = rowData.values || {};
+      const caja = getValueForCopy(values, 'caja');
+      const referencia = getValueForCopy(values, 'referencia');
+      const cliente = getValueForCopy(values, 'cliente');
+      const trmx = getValueForCopy(values, 'trmx');
+      const tracking = getValueForCopy(values, 'tracking');
+      const text = [
+        'Caja: ' + caja,
+        'Referencia: ' + referencia,
+        'Cliente: ' + cliente,
+        'TR-MX: ' + trmx,
+        'Tracking (link): ' + tracking
+      ].join('\n');
+      try {
+        await copyTextToClipboard(text);
+        showCopyToast('Copiado');
+      } catch (err) {
+        setStatus('No se pudieron copiar los datos.', 'error');
+      }
     }
 
     async function processBulkUploadFile(file) {
@@ -2944,6 +3096,11 @@
         headerRow.appendChild(th);
       }
 
+      const actionsHeader = doc.createElement('th');
+      actionsHeader.textContent = 'Acciones';
+      actionsHeader.classList.add('table-actions-column', 'is-nowrap');
+      headerRow.appendChild(actionsHeader);
+
       refs.tableHead.appendChild(headerRow);
 
       const fragment = doc.createDocumentFragment();
@@ -3075,6 +3232,30 @@
           }
           tr.appendChild(td);
         }
+
+        const actionsCell = doc.createElement('td');
+        actionsCell.classList.add('table-actions-cell', 'is-nowrap');
+        const actionButton = doc.createElement('button');
+        actionButton.type = 'button';
+        actionButton.className = 'table-action-button';
+        actionButton.setAttribute('data-action', 'copy-row-info');
+        actionButton.setAttribute('data-row-index', String(entry.dataIndex));
+        actionButton.setAttribute('aria-label', 'Copiar datos del registro');
+        actionButton.title = 'Copiar datos';
+
+        const iconSpan = doc.createElement('span');
+        iconSpan.className = 'table-action-button__icon';
+        iconSpan.setAttribute('aria-hidden', 'true');
+        iconSpan.textContent = '🇲🇽';
+        actionButton.appendChild(iconSpan);
+
+        const srText = doc.createElement('span');
+        srText.className = 'visually-hidden';
+        srText.textContent = 'Copiar datos del registro';
+        actionButton.appendChild(srText);
+
+        actionsCell.appendChild(actionButton);
+        tr.appendChild(actionsCell);
 
         fragment.appendChild(tr);
       });
@@ -3268,6 +3449,16 @@
     function handleTableBodyClick(event) {
       const target = event.target;
       if (!target || typeof target.closest !== 'function') {
+        return;
+      }
+      const copyTrigger = target.closest('[data-action="copy-row-info"]');
+      if (copyTrigger) {
+        event.preventDefault();
+        const rowIndexAttr = copyTrigger.getAttribute('data-row-index');
+        const dataIndex = rowIndexAttr == null ? NaN : parseInt(rowIndexAttr, 10);
+        if (!Number.isNaN(dataIndex)) {
+          copyRowInfo(dataIndex);
+        }
         return;
       }
       const trigger = target.closest('[data-action="open-edit"]');
