@@ -928,11 +928,24 @@ h6 {
 
 .sheet-grid__viewport {
   width: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: calc(100vh - var(--size-220));
   flex: 1 1 auto;
   min-height: 0;
   position: relative;
+}
+
+.sheet-grid__viewport.is-zoomed {
+  padding-bottom: var(--size-8);
+}
+
+.sheet-grid__table-zoom {
+  --table-scale: 1;
+  transform-origin: top left;
+  transform: scale(var(--table-scale));
+  display: inline-block;
+  vertical-align: top;
 }
 
 [data-loading-indicator] {
