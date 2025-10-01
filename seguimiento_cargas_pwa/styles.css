@@ -1001,6 +1001,55 @@ body [style*='font-weight:900'] {
   font-weight: 400 !important;
 }
 
+.sheet-table thead th.table-actions-column {
+  text-align: center;
+  width: var(--size-80);
+  min-width: var(--size-80);
+}
+
+.sheet-table tbody td.table-actions-cell {
+  text-align: center;
+}
+
+.table-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-32);
+  height: var(--size-32);
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform var(--transition), background var(--transition), box-shadow var(--transition);
+  color: inherit;
+}
+
+.table-action-button:hover,
+.table-action-button:focus {
+  background: var(--accent-surface);
+  box-shadow: 0 0 0 var(--size-2) var(--accent-border-weak);
+}
+
+.table-action-button:active {
+  transform: scale(0.94);
+}
+
+.table-action-button:focus-visible {
+  outline: var(--size-2) solid var(--accent);
+  outline-offset: var(--size-2);
+}
+
+.table-action-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
 .sheet-table tbody td * {
   font-weight: 400 !important;
 }
@@ -1490,6 +1539,34 @@ body [style*='font-weight:900'] {
   position: absolute;
   white-space: nowrap;
   width: 1px;
+}
+
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--size-48);
+  transform: translate(-50%, var(--size-16));
+  background: rgba(17, 17, 20, 0.88);
+  color: #ffffff;
+  padding: var(--size-12) var(--size-20);
+  border-radius: var(--size-999);
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition), transform var(--transition);
+  z-index: 4000;
+}
+
+:root[data-theme='dark'] .copy-toast {
+  background: rgba(245, 245, 247, 0.92);
+  color: rgba(28, 28, 30, 0.95);
+}
+
+.copy-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .table-link:hover,
