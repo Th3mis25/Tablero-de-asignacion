@@ -2,7 +2,7 @@
 
 :root {
   color-scheme: light;
-  --app-scale: 0.75;
+  --app-scale: 1;
   --size-1: calc(1px * var(--app-scale));
   --size-2: calc(2px * var(--app-scale));
   --size-3: calc(3px * var(--app-scale));
