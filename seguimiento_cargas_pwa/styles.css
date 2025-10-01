@@ -267,6 +267,7 @@ h6 {
 .sheet-app__title-group {
   grid-area: title;
   text-align: center;
+  display: none;
 }
 
 .sheet-app__title-group h1 {
