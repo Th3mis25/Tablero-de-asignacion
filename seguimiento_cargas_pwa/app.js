@@ -2063,6 +2063,34 @@
       }
     }
 
+    function shareRowInfoToWhatsapp(dataIndex) {
+      const rowData = getRowDataForIndex(dataIndex);
+      if (!rowData) {
+        setStatus('No fue posible preparar el mensaje para WhatsApp.', 'error');
+        return;
+      }
+      const values = rowData.values || {};
+      const caja = getValueForCopy(values, 'caja');
+      const referencia = getValueForCopy(values, 'referencia');
+      const cliente = getValueForCopy(values, 'cliente');
+      const trusa = getValueForCopy(values, 'trusa');
+      const tracking = getValueForCopy(values, 'tracking');
+      const message = [
+        'Caja: ' + caja,
+        'Referencia: ' + referencia,
+        'Cliente: ' + cliente,
+        'TR-USA: ' + trusa,
+        'Tracking (link): ' + tracking
+      ].join('\n');
+      const whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
+      const openedWindow = typeof global.open === 'function'
+        ? global.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+        : null;
+      if (!openedWindow) {
+        setStatus('No se pudo abrir WhatsApp. Permite las ventanas emergentes e inténtalo de nuevo.', 'error');
+      }
+    }
+
     async function processBulkUploadFile(file) {
       if (!file) {
         setStatus('Selecciona un archivo de Excel para continuar.', 'error');
@@ -3235,6 +3263,7 @@
 
         const actionsCell = doc.createElement('td');
         actionsCell.classList.add('table-actions-cell', 'is-nowrap');
+
         const actionButton = doc.createElement('button');
         actionButton.type = 'button';
         actionButton.className = 'table-action-button';
@@ -3255,6 +3284,36 @@
         actionButton.appendChild(srText);
 
         actionsCell.appendChild(actionButton);
+
+        const whatsappButton = doc.createElement('button');
+        whatsappButton.type = 'button';
+        whatsappButton.className = 'table-action-button';
+        whatsappButton.setAttribute('data-action', 'share-row-whatsapp-usa');
+        whatsappButton.setAttribute('data-row-index', String(entry.dataIndex));
+        whatsappButton.setAttribute(
+          'aria-label',
+          'Compartir datos del registro por WhatsApp (USA)'
+        );
+        whatsappButton.title = 'Compartir por WhatsApp (USA)';
+
+        const whatsappIconSpan = doc.createElement('span');
+        whatsappIconSpan.className = 'table-action-button__icon';
+        whatsappIconSpan.setAttribute('aria-hidden', 'true');
+
+        const whatsappIconImage = doc.createElement('img');
+        whatsappIconImage.src = 'assets/estados-unidos-de-america.png';
+        whatsappIconImage.alt = '';
+        whatsappIconImage.className = 'table-action-button__icon-image';
+        whatsappIconSpan.appendChild(whatsappIconImage);
+
+        whatsappButton.appendChild(whatsappIconSpan);
+
+        const whatsappSrText = doc.createElement('span');
+        whatsappSrText.className = 'visually-hidden';
+        whatsappSrText.textContent = 'Compartir datos del registro por WhatsApp (USA)';
+        whatsappButton.appendChild(whatsappSrText);
+
+        actionsCell.appendChild(whatsappButton);
         tr.appendChild(actionsCell);
 
         fragment.appendChild(tr);
@@ -3458,6 +3517,16 @@
         const dataIndex = rowIndexAttr == null ? NaN : parseInt(rowIndexAttr, 10);
         if (!Number.isNaN(dataIndex)) {
           copyRowInfo(dataIndex);
+        }
+        return;
+      }
+      const whatsappTrigger = target.closest('[data-action="share-row-whatsapp-usa"]');
+      if (whatsappTrigger) {
+        event.preventDefault();
+        const rowIndexAttr = whatsappTrigger.getAttribute('data-row-index');
+        const dataIndex = rowIndexAttr == null ? NaN : parseInt(rowIndexAttr, 10);
+        if (!Number.isNaN(dataIndex)) {
+          shareRowInfoToWhatsapp(dataIndex);
         }
         return;
       }
