@@ -2904,6 +2904,8 @@
 
     let pendingTableZoomFrame = null;
     let pendingTableZoomIsTimeout = false;
+    let tableResizeObserver = null;
+    let viewportResizeObserver = null;
 
     function resetTableZoom() {
       if (pendingTableZoomFrame != null) {
@@ -2972,6 +2974,32 @@
           pendingTableZoomIsTimeout = false;
           applyTableZoom();
         }, 16);
+      }
+    }
+
+    function observeTableZoom() {
+      if (typeof global.ResizeObserver !== 'function') {
+        return;
+      }
+
+      if (refs.tableElement && !tableResizeObserver) {
+        tableResizeObserver = new global.ResizeObserver(function () {
+          scheduleTableZoomUpdate();
+        });
+      }
+
+      if (refs.tableViewport && !viewportResizeObserver) {
+        viewportResizeObserver = new global.ResizeObserver(function () {
+          scheduleTableZoomUpdate();
+        });
+      }
+
+      if (refs.tableElement && tableResizeObserver) {
+        tableResizeObserver.observe(refs.tableElement);
+      }
+
+      if (refs.tableViewport && viewportResizeObserver) {
+        viewportResizeObserver.observe(refs.tableViewport);
       }
     }
 
@@ -3906,19 +3934,15 @@
 
     if (refs.tableViewport || refs.tableElement) {
       scheduleTableZoomUpdate();
+      if (doc && doc.fonts && typeof doc.fonts.ready === 'object' && typeof doc.fonts.ready.then === 'function') {
+        doc.fonts.ready.then(function () {
+          scheduleTableZoomUpdate();
+        });
+      }
+      observeTableZoom();
     }
 
-    if (typeof global.ResizeObserver === 'function' && (refs.tableElement || refs.tableViewport)) {
-      const resizeObserver = new global.ResizeObserver(function () {
-        scheduleTableZoomUpdate();
-      });
-      if (refs.tableElement) {
-        resizeObserver.observe(refs.tableElement);
-      }
-      if (refs.tableViewport) {
-        resizeObserver.observe(refs.tableViewport);
-      }
-    } else if (typeof global.addEventListener === 'function') {
+    if (typeof global.addEventListener === 'function') {
       global.addEventListener('resize', scheduleTableZoomUpdate);
       global.addEventListener('orientationchange', scheduleTableZoomUpdate);
     }
