@@ -990,7 +990,7 @@ h6 {
 .sheet-table tbody td,
 .sheet-table tbody th {
   border: none;
-  padding: var(--size-16) var(--size-12);
+  padding: var(--size-10) var(--size-12);
   line-height: 1.45;
   white-space: normal;
   background: var(--sheet-surface);
