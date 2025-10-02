@@ -1641,18 +1641,69 @@
       return { rows: [], issues: ['El archivo no contiene filas con datos.'] };
     }
 
+    let rowsForProcessing = rawRows;
+    let rowNumbers = null;
     const headerSet = new Set();
-    rawRows.forEach(function (row) {
-      if (!row || typeof row !== 'object') {
-        return;
-      }
-      Object.keys(row).forEach(function (key) {
-        const canonical = normalizeBulkHeader(key);
+
+    if (Array.isArray(rawRows[0])) {
+      const headerRow = rawRows[0];
+      const headerMap = Array.isArray(headerRow)
+        ? headerRow.map(function (header) {
+          return normalizeBulkHeader(header);
+        })
+        : [];
+
+      headerMap.forEach(function (canonical) {
         if (canonical) {
           headerSet.add(canonical);
         }
       });
-    });
+
+      if (rawRows.length <= 1) {
+        return { rows: [], issues: ['El archivo no contiene filas con datos.'] };
+      }
+
+      rowsForProcessing = [];
+      rowNumbers = [];
+      for (let i = 1; i < rawRows.length; i++) {
+        const rowArray = rawRows[i];
+        const rowObject = {};
+        if (Array.isArray(rowArray)) {
+          headerMap.forEach(function (canonical, columnIndex) {
+            if (!canonical) {
+              return;
+            }
+            if (columnIndex < rowArray.length) {
+              rowObject[canonical] = rowArray[columnIndex];
+            }
+          });
+        }
+        rowsForProcessing.push(rowObject);
+        rowNumbers.push(i + 1);
+      }
+    } else {
+      rowsForProcessing.forEach(function (row) {
+        if (!row || typeof row !== 'object') {
+          return;
+        }
+        Object.keys(row).forEach(function (key) {
+          const canonical = normalizeBulkHeader(key);
+          if (canonical) {
+            headerSet.add(canonical);
+          }
+        });
+      });
+    }
+
+    if (rowsForProcessing.length === 0) {
+      return { rows: [], issues: ['El archivo no contiene filas con datos.'] };
+    }
+
+    if (!rowNumbers) {
+      rowNumbers = rowsForProcessing.map(function (_row, index) {
+        return index + 2;
+      });
+    }
 
     const missingHeaders = BULK_REQUIRED_HEADERS.filter(function (label) {
       return !headerSet.has(label);
@@ -1664,7 +1715,7 @@
       };
     }
 
-    rawRows.forEach(function (row, index) {
+    rowsForProcessing.forEach(function (row, index) {
       if (!row || typeof row !== 'object') {
         return;
       }
@@ -1689,7 +1740,7 @@
         return;
       }
 
-      const rowNumber = index + 2;
+      const rowNumber = rowNumbers[index] != null ? rowNumbers[index] : index + 2;
       const rowIssues = [];
       const output = {};
 
