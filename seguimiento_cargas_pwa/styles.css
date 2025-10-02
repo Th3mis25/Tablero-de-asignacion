@@ -55,8 +55,6 @@
   --accent-border-weak: rgba(10, 132, 255, 0.24);
   --accent-border-strong: rgba(10, 132, 255, 0.5);
   --accent-shadow: rgba(10, 132, 255, 0.35);
-  --appointment-column-bg: rgba(10, 132, 255, 0.08);
-  --appointment-column-bg-hover: rgba(10, 132, 255, 0.18);
   --danger: #ff3b30;
   --success: #34c759;
   --status-default-bg: rgba(95, 99, 104, 0.12);
@@ -131,8 +129,6 @@
   --accent-border-weak: rgba(68, 156, 255, 0.45);
   --accent-border-strong: rgba(68, 156, 255, 0.75);
   --accent-shadow: rgba(21, 74, 138, 0.5);
-  --appointment-column-bg: rgba(43, 143, 255, 0.18);
-  --appointment-column-bg-hover: rgba(43, 143, 255, 0.32);
   --danger: #ff625a;
   --success: #2fdf84;
   --status-default-bg: rgba(76, 110, 153, 0.28);
@@ -1098,17 +1094,8 @@ h6 {
   backdrop-filter: blur(var(--size-4));
 }
 
-.sheet-table tbody td.is-appointment-column {
-  background: var(--appointment-column-bg);
-  transition: background-color var(--transition), background var(--transition);
-}
-
 .sheet-table tbody tr:hover td {
   background: var(--accent-surface);
-}
-
-.sheet-table tbody tr:hover td.is-appointment-column {
-  background: var(--appointment-column-bg-hover);
 }
 
 .sheet-table tbody tr:hover td:first-child {
