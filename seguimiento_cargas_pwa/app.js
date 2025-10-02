@@ -3234,6 +3234,9 @@
         if (columnKey && NOWRAP_COLUMN_KEYS.has(columnKey)) {
           th.classList.add('is-nowrap');
         }
+        if (columnKey && DATE_FIELD_SET.has(columnKey)) {
+          th.classList.add('is-milestone');
+        }
         headerRow.appendChild(th);
       }
 
@@ -3288,6 +3291,9 @@
           }
           if (columnKey && NOWRAP_COLUMN_KEYS.has(columnKey)) {
             td.classList.add('is-nowrap');
+          }
+          if (columnKey && DATE_FIELD_SET.has(columnKey)) {
+            td.classList.add('is-milestone');
           }
           if (value === null || value === undefined || value === '') {
             td.classList.add('is-empty');
