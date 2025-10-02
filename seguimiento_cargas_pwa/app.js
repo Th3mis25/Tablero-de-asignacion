@@ -473,7 +473,7 @@
   );
 
   const TODAY_DELIVERY_EXCLUDED_STATUS_SET = new Set(
-    ['at destination', 'delivered', 'cancelled'].map(function (status) {
+    ['delivered', 'cancelled'].map(function (status) {
       return status.toLowerCase();
     })
   );
