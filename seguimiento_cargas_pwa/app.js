@@ -3067,6 +3067,15 @@
         };
       });
 
+      const appointmentColumnIndices = ['citaCarga', 'llegadaCarga', 'citaEntrega', 'llegadaEntrega']
+        .map(function (key) {
+          return columnMap[key];
+        })
+        .filter(function (index) {
+          return typeof index === 'number' && index >= 0;
+        });
+      const appointmentColumnIndexSet = new Set(appointmentColumnIndices);
+
       const activeView = getActiveView();
       const filterContext = {
         columnMap: columnMap,
@@ -3281,6 +3290,9 @@
           const isTripColumn = columnKey === 'trip';
           const isTrackingColumn = columnKey === 'tracking';
           const isStatusColumn = columnKey === 'estatus';
+          if (appointmentColumnIndexSet.has(c)) {
+            td.classList.add('is-appointment-column');
+          }
           if (isDateHeader(headerLabel) && value !== '') {
             const formatted = fmtDate(value, state.locale);
             value = formatted || value;
