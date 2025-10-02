@@ -35,6 +35,15 @@
         </div>
         <button type="button" class="button button--secondary is-hidden" data-action="change-token">Cambiar token</button>
         <button type="button" class="button button--secondary" data-action="refresh">Actualizar</button>
+        <button type="button" class="button button--secondary" data-action="bulk-upload">Carga masiva</button>
+        <input
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          data-bulk-upload-input
+          class="is-hidden"
+          tabindex="-1"
+          aria-hidden="true"
+        />
         <button type="button" class="button button--primary" data-action="new-record">Nuevo registro</button>
         <button type="button" class="button button--secondary" data-action="logout">Cerrar sesión</button>
       </div>
