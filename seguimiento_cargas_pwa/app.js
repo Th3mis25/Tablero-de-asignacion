@@ -1832,6 +1832,8 @@
 
     let copyToastTimeoutId = null;
     let copyToastHideTimeoutId = null;
+    let tableZoomAnimationFrameId = null;
+    let tableResizeObserver = null;
 
     function setTheme(theme, options) {
       const normalized = theme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
@@ -2912,9 +2914,47 @@
       }
     }
 
+    function resetTableZoom() {
+      if (!refs.tableElement) {
+        return;
+      }
+      refs.tableElement.classList.remove('is-zoomed');
+      refs.tableElement.style.removeProperty('--table-scale');
+    }
+
+    function updateTableZoom() {
+      if (!refs.tableElement || !refs.tableViewport) {
+        return;
+      }
+      const viewportWidth = refs.tableViewport.clientWidth;
+      const tableWidth = refs.tableElement.scrollWidth;
+      if (!viewportWidth || !tableWidth) {
+        resetTableZoom();
+        return;
+      }
+      const scale = Math.min(1, viewportWidth / tableWidth);
+      if (scale < 0.999) {
+        refs.tableElement.style.setProperty('--table-scale', String(scale));
+        refs.tableElement.classList.add('is-zoomed');
+      } else {
+        resetTableZoom();
+      }
+    }
+
+    function scheduleTableZoomUpdate() {
+      if (tableZoomAnimationFrameId != null) {
+        global.cancelAnimationFrame(tableZoomAnimationFrameId);
+      }
+      tableZoomAnimationFrameId = global.requestAnimationFrame(function () {
+        tableZoomAnimationFrameId = null;
+        updateTableZoom();
+      });
+    }
+
     function clearTable() {
       if (refs.tableHead) refs.tableHead.innerHTML = '';
       if (refs.tableBody) refs.tableBody.innerHTML = '';
+      resetTableZoom();
     }
 
     function renderTable() {
@@ -2927,6 +2967,7 @@
       if (!Array.isArray(state.data) || state.data.length === 0) {
         updateAvailableStatuses([]);
         setStatus('No hay datos disponibles en la hoja.', 'info');
+        scheduleTableZoomUpdate();
         return;
       }
 
@@ -3354,12 +3395,30 @@
 
       refs.tableBody.appendChild(fragment);
 
+      scheduleTableZoomUpdate();
+
       if (rowsToRender.length === 0) {
         setStatus('No hay registros para la vista seleccionada.', 'info');
       } else {
         setStatus('Sincronizado', 'success');
       }
 
+    }
+
+    scheduleTableZoomUpdate();
+    if (typeof global.ResizeObserver === 'function') {
+      tableResizeObserver = new global.ResizeObserver(function () {
+        scheduleTableZoomUpdate();
+      });
+      if (refs.tableViewport) {
+        tableResizeObserver.observe(refs.tableViewport);
+      }
+      if (refs.tableElement) {
+        tableResizeObserver.observe(refs.tableElement);
+      }
+    }
+    if (typeof global.addEventListener === 'function') {
+      global.addEventListener('resize', scheduleTableZoomUpdate);
     }
 
     function getRowDataForIndex(dataIndex) {

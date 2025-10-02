@@ -977,13 +977,19 @@ h6 {
 }
 
 .sheet-table {
+  --table-scale: 1;
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   font-size: var(--font-size-xs);
   table-layout: auto;
-  transition: opacity var(--transition);
+  transition: opacity var(--transition), transform var(--transition);
+  transform-origin: top left;
+}
+
+.sheet-table.is-zoomed {
+  transform: scale(var(--table-scale));
 }
 
 .sheet-table thead th,
