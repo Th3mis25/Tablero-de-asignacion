@@ -1509,9 +1509,6 @@
   }
 
   function createZipReader(arrayBuffer) {
-    if (typeof global.DecompressionStream === 'undefined') {
-      throw new Error('Este navegador no soporta la descompresión de archivos .xlsx.');
-    }
     if (typeof global.JSZip !== 'function') {
       throw new Error('Este navegador no soporta la lectura de archivos de Excel.');
     }
@@ -1526,7 +1523,7 @@
         if (!entry) {
           throw new Error('El archivo de Excel está incompleto.');
         }
-        if (entry._data && entry._data.compressedContent) {
+        if (entry._data && entry._data.compressedContent && typeof global.DecompressionStream === 'function') {
           const stream = entry._data.compressedContent();
           const decompressedStream = stream.pipeThrough(new global.DecompressionStream('deflate'));
           const response = new global.Response(decompressedStream);
