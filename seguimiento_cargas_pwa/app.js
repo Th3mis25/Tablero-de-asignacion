@@ -510,7 +510,7 @@
   );
 
   const CONFIRMED_APPOINTMENTS_EXCLUDED_STATUS_SET = new Set(
-    ['delivered', 'live', 'drop', 'cancelled'].map(function (status) {
+    ['delivered', 'cancelled'].map(function (status) {
       return status.toLowerCase();
     })
   );
