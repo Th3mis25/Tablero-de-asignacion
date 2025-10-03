@@ -30,6 +30,8 @@
   const DATE_FIELD_KEYS = ['citaCarga', 'llegadaCarga', 'citaEntrega', 'llegadaEntrega'];
   const DATE_FIELD_SET = new Set(DATE_FIELD_KEYS);
   const NOWRAP_COLUMN_KEYS = new Set(['trip', 'caja', 'trmx', 'trusa']);
+  const DOCS_TRUE_VALUES = new Set(['yes', 'si', 'sí', 'true', '1']);
+  const DOCS_FALSE_VALUES = new Set(['no', 'false', '0']);
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
   const COLUMN_LABEL_TO_KEY = COLUMN_CONFIG.reduce(function (acc, column) {
     if (column && column.label) {
@@ -194,6 +196,35 @@
       return Number.POSITIVE_INFINITY;
     }
     return time;
+  }
+
+  function parseDocsValue(value) {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value === 1) {
+        return true;
+      }
+      if (value === 0) {
+        return false;
+      }
+    }
+    if (value == null) {
+      return null;
+    }
+    const stringValue = String(value).trim();
+    if (!stringValue) {
+      return null;
+    }
+    const normalized = stringValue.toLowerCase();
+    if (DOCS_TRUE_VALUES.has(normalized)) {
+      return true;
+    }
+    if (DOCS_FALSE_VALUES.has(normalized)) {
+      return false;
+    }
+    return null;
   }
 
   function resolveLocale(locale) {
@@ -3281,6 +3312,8 @@
           const isTripColumn = columnKey === 'trip';
           const isTrackingColumn = columnKey === 'tracking';
           const isStatusColumn = columnKey === 'estatus';
+          const isDocsColumn = columnKey === 'docs';
+          const docsValue = isDocsColumn ? parseDocsValue(rawCell) : null;
           if (isDateHeader(headerLabel) && value !== '') {
             const formatted = fmtDate(value, state.locale);
             value = formatted || value;
@@ -3289,7 +3322,24 @@
           if (columnKey && NOWRAP_COLUMN_KEYS.has(columnKey)) {
             td.classList.add('is-nowrap');
           }
-          if (value === null || value === undefined || value === '') {
+          if (isDocsColumn && docsValue !== null) {
+            td.classList.add('has-docs-indicator');
+            const indicator = doc.createElement('span');
+            indicator.className = 'docs-indicator ' + (docsValue ? 'docs-indicator--true' : 'docs-indicator--false');
+
+            const icon = doc.createElement('span');
+            icon.className = 'docs-indicator__icon';
+            icon.setAttribute('aria-hidden', 'true');
+            icon.textContent = docsValue ? '✓' : '✕';
+            indicator.appendChild(icon);
+
+            const srText = doc.createElement('span');
+            srText.className = 'visually-hidden';
+            srText.textContent = docsValue ? 'Cuenta con documentación' : 'No cuenta con documentación';
+            indicator.appendChild(srText);
+
+            td.appendChild(indicator);
+          } else if (value === null || value === undefined || value === '') {
             td.classList.add('is-empty');
             td.textContent = '';
           } else if (isTripColumn) {
