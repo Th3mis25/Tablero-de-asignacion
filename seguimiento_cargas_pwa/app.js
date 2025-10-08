@@ -1563,9 +1563,15 @@
     }
     const zip = new global.JSZip();
     return zip.loadAsync(arrayBuffer).then(function (archive) {
-      const entries = {};
+      const entries = new Map();
+      const normalizedEntries = new Map();
       archive.forEach(function (relativePath, file) {
-        entries[relativePath] = file;
+        const normalizedPath = normalizeZipPath(relativePath) || String(relativePath || '').trim();
+        if (!normalizedPath) {
+          return;
+        }
+        entries.set(normalizedPath, file);
+        normalizedEntries.set(normalizedPath.toLowerCase(), file);
       });
 
       async function decompressEntry(entry) {
@@ -1591,13 +1597,29 @@
 
       return {
         has: function (name) {
-          return Object.prototype.hasOwnProperty.call(entries, name);
+          const normalized = normalizeZipPath(name) || '';
+          if (!normalized) {
+            return false;
+          }
+          if (entries.has(normalized)) {
+            return true;
+          }
+          const lowerKey = normalized.toLowerCase();
+          return normalizedEntries.has(lowerKey);
         },
         readText: async function (name) {
-          if (!Object.prototype.hasOwnProperty.call(entries, name)) {
+          const normalized = normalizeZipPath(name) || '';
+          if (!normalized) {
             throw new Error(`El archivo de Excel no contiene el recurso "${name}".`);
           }
-          const buffer = await decompressEntry(entries[name]);
+          let entry = entries.get(normalized);
+          if (!entry) {
+            entry = normalizedEntries.get(normalized.toLowerCase()) || null;
+          }
+          if (!entry) {
+            throw new Error(`El archivo de Excel no contiene el recurso "${name}".`);
+          }
+          const buffer = await decompressEntry(entry);
           return textDecoder.decode(new Uint8Array(buffer));
         }
       };
