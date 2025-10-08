@@ -1145,13 +1145,14 @@
   }
 
   const BULK_ALLOWED_EXTENSIONS = new Set(['xlsx', 'xlsm']);
-  const BULK_REQUIRED_HEADERS = ['Trip', 'Ejecutivo'];
+  const BULK_REQUIRED_HEADERS = ['Trip'];
   const BULK_TEXT_HEADERS = [
+    'Ejecutivo',
     'Caja',
-    'Estatus',
+    'Referencia',
     'Cliente',
     'Destino',
-    'Referencia',
+    'Estatus',
     'Segmento',
     'TR-MX',
     'TR-USA',
@@ -1160,7 +1161,24 @@
     'Tracking'
   ];
   const BULK_DATE_HEADERS = ['Cita carga', 'Llegada carga', 'Cita entrega', 'Llegada entrega'];
-  const BULK_OPTIONAL_HEADERS = BULK_TEXT_HEADERS.concat(BULK_DATE_HEADERS);
+  const BULK_OPTIONAL_HEADERS = [
+    'Ejecutivo',
+    'Caja',
+    'Referencia',
+    'Cliente',
+    'Destino',
+    'Estatus',
+    'Segmento',
+    'TR-MX',
+    'TR-USA',
+    'Cita carga',
+    'Llegada carga',
+    'Cita entrega',
+    'Llegada entrega',
+    'Comentarios',
+    'Docs',
+    'Tracking'
+  ];
   const BULK_CANONICAL_HEADERS = BULK_REQUIRED_HEADERS.concat(BULK_OPTIONAL_HEADERS);
   const BULK_HEADER_NORMALIZATION_MAP = (function () {
     const map = {};
@@ -1785,13 +1803,6 @@
         rowIssues.push('Trip menor a 225000');
       }
       output.Trip = tripValue;
-
-      const rawEjecutivo = normalizedValues.Ejecutivo;
-      const ejecutivoValue = rawEjecutivo == null ? '' : String(rawEjecutivo).trim();
-      if (!ejecutivoValue) {
-        rowIssues.push('Ejecutivo vacío');
-      }
-      output.Ejecutivo = ejecutivoValue;
 
       BULK_TEXT_HEADERS.forEach(function (label) {
         const rawValue = normalizedValues[label];
@@ -3752,16 +3763,6 @@
         const tripInput = refs.editForm.querySelector('[name="trip"]');
         if (tripInput) {
           tripInput.focus();
-        }
-        return;
-      }
-      if (!ejecutivoValue) {
-        if (refs.editError) {
-          refs.editError.textContent = 'El campo Ejecutivo es obligatorio.';
-        }
-        const ejecutivoInput = refs.editForm.querySelector('[name="ejecutivo"]');
-        if (ejecutivoInput) {
-          ejecutivoInput.focus();
         }
         return;
       }

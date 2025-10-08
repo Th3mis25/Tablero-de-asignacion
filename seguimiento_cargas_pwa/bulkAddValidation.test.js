@@ -74,20 +74,22 @@ const result = callBulkAdd([
 ]);
 
 assert.strictEqual(result.success, true, 'bulkAdd should succeed even with invalid rows');
-assert.strictEqual(result.inserted, 1, 'Only one valid row should be inserted');
+assert.strictEqual(result.inserted, 2, 'Two valid rows should be inserted when only Trip is required');
 assert.deepStrictEqual(result.duplicates, [], 'No duplicates should be reported');
 assert.deepStrictEqual(
   result.invalidRows,
   [
     'Fila 2: Trip vacío.',
     'Fila 3: Trip inválido.',
-    'Fila 4: Trip menor a 225000.',
-    'Fila 5: Ejecutivo vacío.'
+    'Fila 4: Trip menor a 225000.'
   ],
   'Invalid rows should include detailed issues'
 );
-assert.strictEqual(appendedValues.length, 1, 'Only one row should be appended for valid data');
+assert.strictEqual(appendedValues.length, 2, 'Two rows should be appended for valid data');
 const tripIndex = headers.indexOf('Trip');
-assert.strictEqual(appendedValues[0][tripIndex], '225124', 'Trip should be trimmed and stored as string');
+const ejecutivoIndex = headers.indexOf('Ejecutivo');
+assert.strictEqual(appendedValues[0][tripIndex], '225123', 'Trip 225123 should be stored for rows with optional Ejecutivo');
+assert.strictEqual(appendedValues[0][ejecutivoIndex], '', 'Ejecutivo can remain blank in bulk uploads');
+assert.strictEqual(appendedValues[1][tripIndex], '225124', 'Trip should be trimmed and stored as string');
 
 console.log('Bulk add validation test passed.');
