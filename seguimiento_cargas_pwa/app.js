@@ -1226,6 +1226,28 @@
     50, 51, 52, 53, 54, 55, 56, 57, 58
   ]);
   const textDecoder = typeof global.TextDecoder === 'function' ? new global.TextDecoder('utf-8') : null;
+  const WORKBOOK_RELATIONSHIP_TYPES = new Set([
+    'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument',
+    'http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument',
+    'http://schemas.microsoft.com/office/2006/relationships/officeDocument'
+  ].map(function (value) {
+    return String(value || '').toLowerCase();
+  }));
+  const WORKBOOK_CONTENT_TYPES = new Set([
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.addin.main+xml',
+    'application/vnd.ms-excel.sheet.macroenabled.main+xml',
+    'application/vnd.ms-excel.sheet.macroenabled.main',
+    'application/vnd.ms-excel.template.macroenabled.main+xml',
+    'application/vnd.ms-excel.template.macroenabled.main',
+    'application/vnd.ms-excel.addin.macroenabled.main+xml',
+    'application/vnd.ms-excel.addin.macroenabled.main',
+    'application/vnd.ms-excel.sheet.binary.macroenabled.main',
+    'application/vnd.ms-excel.sheet.binary.macroenabled.main+xml'
+  ].map(function (value) {
+    return String(value || '').toLowerCase();
+  }));
 
   function normalizeBulkHeader(name) {
     if (name == null) {
@@ -1290,6 +1312,104 @@
       normalized = `xl/${normalized}`;
     }
     return normalizeZipPath(normalized);
+  }
+
+  function isWorkbookRelationshipType(type) {
+    if (!type) {
+      return false;
+    }
+    const normalized = String(type).trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+    return WORKBOOK_RELATIONSHIP_TYPES.has(normalized);
+  }
+
+  function isWorkbookContentType(contentType) {
+    if (!contentType) {
+      return false;
+    }
+    const normalized = String(contentType).trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+    if (WORKBOOK_CONTENT_TYPES.has(normalized)) {
+      return true;
+    }
+    if (/application\/vnd\.openxmlformats-officedocument\.spreadsheetml\.(?:sheet|template|addin)\.main\+xml$/.test(normalized)) {
+      return true;
+    }
+    if (/application\/vnd\.(?:openxmlformats-officedocument|ms-excel)\.(?:spreadsheetml\.)?(?:sheet|template|addin)\.macroenabled\.main(?:\+xml)?$/.test(normalized)) {
+      return true;
+    }
+    if (/application\/vnd\.ms-excel\.sheet\.binary\.macroenabled\.main(?:\+xml)?$/.test(normalized)) {
+      return true;
+    }
+    return false;
+  }
+
+  async function resolveWorkbookPath(zipReader) {
+    const defaultPath = normalizeZipPath('xl/workbook.xml');
+    if (defaultPath && zipReader.has(defaultPath)) {
+      return defaultPath;
+    }
+
+    const candidates = new Set();
+    const addCandidate = function (path) {
+      const normalized = normalizeZipPath(String(path || '').trim());
+      if (normalized) {
+        candidates.add(normalized);
+      }
+    };
+
+    const rootRelsPath = normalizeZipPath('_rels/.rels');
+    if (rootRelsPath && zipReader.has(rootRelsPath)) {
+      try {
+        const relsXml = await zipReader.readText(rootRelsPath);
+        const relsDoc = parseXmlDocument(relsXml);
+        const relationships = relsDoc.getElementsByTagName('Relationship');
+        for (let i = 0; i < relationships.length; i++) {
+          const rel = relationships[i];
+          const typeAttr = rel.getAttribute('Type');
+          const target = rel.getAttribute('Target');
+          if (isWorkbookRelationshipType(typeAttr) && target) {
+            addCandidate(target);
+          }
+        }
+      } catch (err) {
+        // Ignorar errores y continuar con otros métodos de resolución.
+      }
+    }
+
+    const contentTypesPath = normalizeZipPath('[Content_Types].xml');
+    if (contentTypesPath && zipReader.has(contentTypesPath)) {
+      try {
+        const contentTypesXml = await zipReader.readText(contentTypesPath);
+        const contentTypesDoc = parseXmlDocument(contentTypesXml);
+        const overrides = contentTypesDoc.getElementsByTagName('Override');
+        for (let i = 0; i < overrides.length; i++) {
+          const override = overrides[i];
+          const contentTypeAttr = override.getAttribute('ContentType');
+          if (!isWorkbookContentType(contentTypeAttr)) {
+            continue;
+          }
+          const partName = override.getAttribute('PartName');
+          if (partName) {
+            addCandidate(partName);
+          }
+        }
+      } catch (err) {
+        // Ignorar errores y continuar con otros métodos de resolución.
+      }
+    }
+
+    for (const candidate of candidates) {
+      if (zipReader.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return '';
   }
 
   function parseXmlDocument(xmlText) {
@@ -1727,7 +1847,11 @@
 
   async function parseXlsxRows(arrayBuffer) {
     const zipReader = await createZipReader(arrayBuffer);
-    const workbookXml = await zipReader.readText('xl/workbook.xml').catch(function () {
+    const workbookPath = await resolveWorkbookPath(zipReader);
+    if (!workbookPath) {
+      throw new Error('El archivo de Excel no contiene la información del libro.');
+    }
+    const workbookXml = await zipReader.readText(workbookPath).catch(function () {
       throw new Error('El archivo de Excel no contiene la información del libro.');
     });
     const workbookDoc = parseXmlDocument(workbookXml);
