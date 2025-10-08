@@ -2094,7 +2094,11 @@
       status: doc.querySelector('[data-status]'),
       refreshButton: doc.querySelector('[data-action="refresh"]'),
       bulkUploadButton: doc.querySelector('[data-action="bulk-upload"]'),
-      bulkUploadInput: doc.querySelector('[data-bulk-upload-input]'),
+      bulkConsole: doc.querySelector('[data-bulk-console]'),
+      bulkConsoleFileInput: doc.querySelector('[data-bulk-console-file-input]'),
+      bulkConsoleProcessButton: doc.querySelector('[data-action="bulk-console-process"]'),
+      bulkConsoleCloseButton: doc.querySelector('[data-action="close-bulk-console"]'),
+      bulkConsoleLog: doc.querySelector('[data-bulk-console-log]'),
       newRecordButton: doc.querySelector('[data-action="new-record"]'),
       logoutButton: doc.querySelector('[data-action="logout"]'),
       changeTokenButton: doc.querySelector('[data-action="change-token"]'),
@@ -2169,6 +2173,7 @@
     let copyToastHideTimeoutId = null;
     let tableZoomAnimationFrameId = null;
     let tableResizeObserver = null;
+    let bulkConsoleFile = null;
 
     function setTheme(theme, options) {
       const normalized = theme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
@@ -2289,6 +2294,106 @@
         hideCopyToast();
         copyToastTimeoutId = null;
       }, 2000);
+    }
+
+    function updateBulkConsoleControls() {
+      if (!refs.bulkConsole) {
+        return;
+      }
+      const isProcessing = Boolean(state.loading);
+      if (refs.bulkConsoleProcessButton) {
+        refs.bulkConsoleProcessButton.disabled = isProcessing || !bulkConsoleFile;
+      }
+      if (refs.bulkConsoleFileInput) {
+        refs.bulkConsoleFileInput.disabled = isProcessing;
+      }
+      if (refs.bulkConsoleCloseButton) {
+        refs.bulkConsoleCloseButton.disabled = isProcessing;
+      }
+    }
+
+    function clearBulkConsoleLog() {
+      if (!refs.bulkConsoleLog) {
+        return;
+      }
+      refs.bulkConsoleLog.textContent = '';
+    }
+
+    function createBulkConsoleTimestamp() {
+      const now = new Date();
+      try {
+        return now.toLocaleTimeString(state.locale, {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      } catch (err) {
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        return hours + ':' + minutes + ':' + seconds;
+      }
+    }
+
+    function appendBulkConsoleLog(message, level) {
+      if (!refs.bulkConsoleLog) {
+        return;
+      }
+      const entry = doc.createElement('div');
+      entry.className = 'bulk-console__log-entry' + (level ? ' is-' + level : '');
+      const time = doc.createElement('span');
+      time.className = 'bulk-console__log-time';
+      time.textContent = createBulkConsoleTimestamp();
+      const text = doc.createElement('span');
+      text.className = 'bulk-console__log-text';
+      text.textContent = message;
+      entry.appendChild(time);
+      entry.appendChild(text);
+      refs.bulkConsoleLog.appendChild(entry);
+      refs.bulkConsoleLog.scrollTop = refs.bulkConsoleLog.scrollHeight;
+    }
+
+    function resetBulkConsole(options) {
+      bulkConsoleFile = null;
+      if (refs.bulkConsoleFileInput) {
+        refs.bulkConsoleFileInput.value = '';
+      }
+      if (!options || options.preserveLog !== true) {
+        clearBulkConsoleLog();
+      }
+      updateBulkConsoleControls();
+    }
+
+    function openBulkConsole() {
+      if (!refs.bulkConsole) {
+        setStatus('No se pudo abrir la consola de carga masiva.', 'error');
+        return;
+      }
+      resetBulkConsole();
+      showBackdrop();
+      refs.bulkConsole.classList.remove('hidden');
+      refs.bulkConsole.classList.add('is-visible');
+      refs.bulkConsole.setAttribute('aria-hidden', 'false');
+      if (refs.bulkConsoleFileInput) {
+        refs.bulkConsoleFileInput.focus();
+      }
+    }
+
+    function closeBulkConsole(options) {
+      if (!refs.bulkConsole) {
+        return;
+      }
+      const forceClose = Boolean(options && options.force);
+      if (state.loading && !forceClose) {
+        appendBulkConsoleLog('Espera a que finalice el procesamiento para cerrar la consola.', 'info');
+        return;
+      }
+      refs.bulkConsole.classList.remove('is-visible');
+      refs.bulkConsole.classList.add('hidden');
+      refs.bulkConsole.setAttribute('aria-hidden', 'true');
+      resetBulkConsole();
+      hideBackdropIfNoModalVisible();
     }
 
     function copyTextToClipboard(text) {
@@ -2452,59 +2557,185 @@
       }
     }
 
-    async function processBulkUploadFile(file) {
-      if (!file) {
-        setStatus('Selecciona un archivo de Excel para continuar.', 'error');
-        return;
+    async function processBulkUploadFile(file, options) {
+      const callbacks = options || {};
+      const logCallback = typeof callbacks.log === 'function' ? callbacks.log : null;
+      const rowStatusCallback = typeof callbacks.onRowStatus === 'function' ? callbacks.onRowStatus : null;
+      const completeCallback = typeof callbacks.onComplete === 'function' ? callbacks.onComplete : null;
+      const errorCallback = typeof callbacks.onError === 'function' ? callbacks.onError : null;
+      let completed = false;
+
+      function emitLog(message, level) {
+        if (!logCallback) {
+          return;
+        }
+        try {
+          logCallback(message, level || 'info');
+        } catch (err) {
+          // Ignora errores en callbacks de logging.
+        }
       }
+
+      function emitRowStatus(row, index, status, details) {
+        if (!rowStatusCallback) {
+          return;
+        }
+        try {
+          rowStatusCallback(row, index, status, details || {});
+        } catch (err) {
+          // Ignora errores en callbacks de estado.
+        }
+      }
+
+      function finish(summary) {
+        if (completed) {
+          return;
+        }
+        completed = true;
+        if (completeCallback) {
+          try {
+            completeCallback(summary);
+          } catch (err) {
+            // Ignora errores en callbacks de finalización.
+          }
+        }
+      }
+
+      function emitError(err) {
+        if (!errorCallback) {
+          return;
+        }
+        try {
+          errorCallback(err);
+        } catch (err2) {
+          // Ignora errores en callbacks de error.
+        }
+      }
+
+      function toError(err, fallbackMessage) {
+        if (err instanceof Error) {
+          return err;
+        }
+        return new Error(fallbackMessage);
+      }
+
+      if (!file) {
+        const message = 'Selecciona un archivo de Excel para continuar.';
+        const error = new Error(message);
+        setStatus(message, 'error');
+        emitLog(message, 'error');
+        emitError(error);
+        finish({ success: false, error: error });
+        return { success: false, error: error };
+      }
+
       const extension = getFileExtension(file.name);
       if (!BULK_ALLOWED_EXTENSIONS.has(extension)) {
-        setStatus(
-          `El archivo debe estar en formato ${BULK_ALLOWED_EXTENSIONS_MESSAGE}.`,
-          'error',
-        );
-        return;
+        const message = `El archivo debe estar en formato ${BULK_ALLOWED_EXTENSIONS_MESSAGE}.`;
+        const error = new Error(message);
+        setStatus(message, 'error');
+        emitLog(message, 'error');
+        emitError(error);
+        finish({ success: false, error: error });
+        return { success: false, error: error };
       }
+
       if (!state.currentUser) {
-        setStatus('Inicia sesión para cargar registros.', 'error');
+        const message = 'Inicia sesión para cargar registros.';
+        const error = new Error(message);
+        setStatus(message, 'error');
+        emitLog(message, 'error');
         showLoginModal();
-        return;
+        emitError(error);
+        finish({ success: false, error: error });
+        return { success: false, error: error };
       }
+
       if (!state.token) {
-        setStatus('Sesión expirada. Inicia sesión nuevamente.', 'error');
+        const message = 'Sesión expirada. Inicia sesión nuevamente.';
+        const error = new Error(message);
+        setStatus(message, 'error');
+        emitLog(message, 'error');
         showLoginModal();
-        return;
+        emitError(error);
+        finish({ success: false, error: error });
+        return { success: false, error: error };
       }
+
       if (!state.config || !state.config.API_BASE) {
-        setStatus('Falta configurar la URL del Apps Script.', 'error');
-        return;
+        const message = 'Falta configurar la URL del Apps Script.';
+        const error = new Error(message);
+        setStatus(message, 'error');
+        emitLog(message, 'error');
+        emitError(error);
+        finish({ success: false, error: error });
+        return { success: false, error: error };
       }
+
       if (state.loading) {
-        setStatus('Espera a que finalice la operación en curso.', 'info');
-        return;
+        const message = 'Espera a que finalice la operación en curso.';
+        setStatus(message, 'info');
+        emitLog(message, 'info');
+        finish({ success: false, reason: 'busy' });
+        return { success: false, reason: 'busy' };
       }
 
       toggleLoading(true);
       try {
         setStatus('Procesando archivo de Excel…', 'info');
+        emitLog('Procesando archivo de Excel…', 'info');
         const rawRows = await readExcelFile(file);
+        const totalRows = Array.isArray(rawRows) ? rawRows.length : 0;
+        emitLog(`Archivo leído correctamente (${totalRows} fila${totalRows === 1 ? '' : 's'} detectadas).`, 'info');
         const preparation = prepareBulkRows(rawRows);
         const validRows = Array.isArray(preparation.rows) ? preparation.rows : [];
         const preparationIssues = Array.isArray(preparation.issues) ? preparation.issues : [];
+
+        validRows.forEach(function (row, index) {
+          const tripValue = row && row.Trip != null ? String(row.Trip).trim() : '';
+          emitRowStatus(row, index, 'validated', {
+            trip: tripValue,
+            message: tripValue
+              ? `Validación completada para Trip ${tripValue}.`
+              : `Validación completada para registro ${index + 1}.`
+          });
+        });
+
+        if (preparationIssues.length > 0) {
+          preparationIssues.forEach(function (issue) {
+            emitLog(issue, 'error');
+            emitRowStatus(null, -1, 'issue', { message: issue });
+          });
+        }
 
         if (validRows.length === 0) {
           const issueSummary = summarizeIssues(preparationIssues, 3);
           const message = issueSummary
             ? `No se encontraron filas válidas. ${issueSummary}`
             : 'No se encontraron filas válidas en el archivo.';
+          const error = new Error(message);
           setStatus(message, 'error');
-          return;
+          emitLog(message, 'error');
+          emitError(error);
+          const summary = {
+            success: false,
+            insertedCount: 0,
+            duplicates: [],
+            issues: preparationIssues.slice(),
+            validRows: []
+          };
+          finish(summary);
+          return summary;
         }
 
+        emitLog(`Enviando ${validRows.length} ${validRows.length === 1 ? 'registro' : 'registros'} para dar de alta…`, 'info');
         const response = await submitBulkAddRequest(state.config.API_BASE, state.token, validRows);
         if (response && response.success === false) {
           throw new Error(response.error || 'No se pudo completar la carga masiva.');
         }
+
+        emitLog('Respuesta recibida del servidor.', 'info');
+
         const insertedCount = typeof response.inserted === 'number' ? response.inserted : validRows.length;
         const duplicates = Array.isArray(response.duplicates) ? response.duplicates : [];
         const serverIssues = Array.isArray(response.invalidRows)
@@ -2521,9 +2752,40 @@
           await loadData();
         }
 
+        const duplicateSet = new Set(
+          duplicates.map(function (value) {
+            return String(value).trim();
+          })
+        );
+
+        validRows.forEach(function (row, index) {
+          const tripValue = row && row.Trip != null ? String(row.Trip).trim() : '';
+          if (tripValue && duplicateSet.has(tripValue)) {
+            emitRowStatus(row, index, 'duplicate', {
+              trip: tripValue,
+              message: `Trip ${tripValue} omitido por duplicado.`
+            });
+          } else {
+            emitRowStatus(row, index, 'inserted', {
+              trip: tripValue,
+              message: tripValue
+                ? `Trip ${tripValue} dado de alta correctamente.`
+                : `Registro ${index + 1} dado de alta correctamente.`
+            });
+          }
+        });
+
+        if (serverIssues.length > 0) {
+          serverIssues.forEach(function (issue) {
+            emitLog(issue, 'error');
+            emitRowStatus(null, -1, 'issue', { message: issue });
+          });
+        }
+
         const parts = [];
         const insertedLabel = insertedCount === 1 ? 'registro' : 'registros';
-        parts.push(`Se agregaron ${insertedCount} ${insertedLabel}.`);
+        const successMessage = `Se agregaron ${insertedCount} ${insertedLabel}.`;
+        parts.push(successMessage);
 
         if (duplicates.length > 0) {
           const duplicatesLabel = duplicates.length === 1 ? 'trip' : 'trips';
@@ -2546,26 +2808,46 @@
           }
         }
 
+        parts.forEach(function (part, index) {
+          emitLog(part, index === 0 ? 'success' : 'info');
+        });
+
         setStatus(parts.join(' '), 'success');
+
+        const summary = {
+          success: true,
+          insertedCount: insertedCount,
+          duplicates: duplicates,
+          issues: combinedIssues,
+          validRows: validRows
+        };
+        finish(summary);
+        return summary;
       } catch (err) {
         const fallbackMessage = 'Error al procesar el archivo de Excel.';
-        const message = err && err.message ? err.message : fallbackMessage;
+        const error = toError(err, fallbackMessage);
+        const message = error && error.message ? error.message : fallbackMessage;
         setStatus(message, 'error');
+        emitLog(message, 'error');
+        emitError(error);
         if (err && err.status === 401) {
           state.token = '';
           setStoredValue(STORAGE_TOKEN_KEY, null);
           showLoginModal();
         }
+        const summary = { success: false, error: error };
+        finish(summary);
+        return summary;
       } finally {
         toggleLoading(false);
+        updateBulkConsoleControls();
+        if (!completed) {
+          finish({ success: false });
+        }
       }
     }
 
     function handleBulkUploadClick() {
-      if (!refs.bulkUploadInput) {
-        setStatus('No se pudo iniciar la carga masiva.', 'error');
-        return;
-      }
       if (!state.currentUser) {
         setStatus('Inicia sesión para cargar registros.', 'error');
         showLoginModal();
@@ -2575,23 +2857,96 @@
         setStatus('Espera a que finalice la operación en curso.', 'info');
         return;
       }
-      refs.bulkUploadInput.value = '';
-      refs.bulkUploadInput.click();
+      openBulkConsole();
     }
 
-    async function handleBulkUploadInputChange(event) {
+    function handleBulkConsoleFileChange(event) {
       const input = event && event.target ? event.target : null;
       const files = input && input.files ? input.files : null;
       const file = files && files[0] ? files[0] : null;
-      try {
-        if (file) {
-          await processBulkUploadFile(file);
-        }
-      } finally {
-        if (input) {
-          input.value = '';
-        }
+      bulkConsoleFile = file || null;
+      clearBulkConsoleLog();
+      if (file) {
+        appendBulkConsoleLog(`Archivo seleccionado: ${file.name}`, 'info');
+        appendBulkConsoleLog('Presiona "Procesar" para iniciar la carga masiva.', 'info');
+      } else {
+        appendBulkConsoleLog('No se seleccionó ningún archivo.', 'error');
       }
+      updateBulkConsoleControls();
+    }
+
+    async function handleBulkConsoleProcessClick(event) {
+      if (event) {
+        event.preventDefault();
+      }
+      if (!bulkConsoleFile) {
+        appendBulkConsoleLog('Selecciona un archivo de Excel antes de procesar.', 'error');
+        return;
+      }
+      if (state.loading) {
+        appendBulkConsoleLog('Ya existe un proceso de carga en curso.', 'info');
+        return;
+      }
+      if (refs.bulkConsoleProcessButton) {
+        refs.bulkConsoleProcessButton.disabled = true;
+      }
+      if (refs.bulkConsoleFileInput) {
+        refs.bulkConsoleFileInput.disabled = true;
+      }
+      const options = {
+        log: function (message, level) {
+          appendBulkConsoleLog(message, level || 'info');
+        },
+        onRowStatus: function (row, index, status, details) {
+          const info = details || {};
+          const tripValue = info.trip != null
+            ? String(info.trip)
+            : row && row.Trip != null
+              ? String(row.Trip).trim()
+              : '';
+          const label = tripValue ? `Trip ${tripValue}` : `Registro ${index + 1}`;
+          let level = 'info';
+          let message;
+          if (status === 'validated') {
+            message = `Validación completada para ${label}.`;
+            level = 'info';
+          } else if (status === 'inserted') {
+            message = info.message || `Alta completada para ${label}.`;
+            level = 'success';
+          } else if (status === 'duplicate') {
+            message = info.message || `${label} omitido por duplicado.`;
+            level = 'error';
+          } else if (status === 'issue') {
+            message = info.message || `${label} con observaciones.`;
+            level = 'error';
+          } else {
+            message = info.message || `${label}: ${status}.`;
+          }
+          appendBulkConsoleLog(message, level);
+        },
+        onError: function (err) {
+          const message = err && err.message ? err.message : 'Error al procesar el archivo de Excel.';
+          appendBulkConsoleLog(message, 'error');
+        },
+        onComplete: function (summary) {
+          if (summary && summary.success) {
+            appendBulkConsoleLog('Carga masiva finalizada.', 'success');
+          }
+          updateBulkConsoleControls();
+        }
+      };
+      try {
+        await processBulkUploadFile(bulkConsoleFile, options);
+      } finally {
+        updateBulkConsoleControls();
+      }
+    }
+
+    function handleBulkConsoleCloseClick(event) {
+      if (event) {
+        event.preventDefault();
+      }
+      closeBulkConsole();
     }
 
     function setEditModalMode(mode) {
@@ -3075,10 +3430,20 @@
     }
 
     function handleDocumentKeydown(event) {
+      const isEscape = event && (event.key === 'Escape' || event.key === 'Esc');
+      if (isEscape) {
+        const consoleVisible = refs.bulkConsole && refs.bulkConsole.classList.contains('is-visible');
+        if (consoleVisible) {
+          if (event && typeof event.preventDefault === 'function') {
+            event.preventDefault();
+          }
+          closeBulkConsole();
+        }
+      }
       if (!state.isDatePopoverOpen && !state.isStatusPopoverOpen) {
         return;
       }
-      if (event && (event.key === 'Escape' || event.key === 'Esc')) {
+      if (isEscape) {
         if (state.isDatePopoverOpen) {
           closeDatePopover();
         }
@@ -3199,7 +3564,8 @@
       }
       const loginVisible = refs.loginModal && refs.loginModal.classList.contains('is-visible');
       const editVisible = refs.editModal && refs.editModal.classList.contains('is-visible');
-      if (!loginVisible && !editVisible) {
+      const consoleVisible = refs.bulkConsole && refs.bulkConsole.classList.contains('is-visible');
+      if (!loginVisible && !editVisible && !consoleVisible) {
         refs.backdrop.classList.remove('is-visible');
         refs.backdrop.classList.add('hidden');
       }
@@ -3250,6 +3616,7 @@
       } else {
         appRoot.classList.remove('is-loading');
       }
+      updateBulkConsoleControls();
     }
 
     function resetTableZoom() {
@@ -4166,6 +4533,7 @@
 
     function handleLogout() {
       closeEditModal();
+      closeBulkConsole({ force: true });
       state.currentUser = null;
       resetFilters();
       updateUserBadge();
@@ -4267,8 +4635,14 @@
     if (refs.bulkUploadButton) {
       refs.bulkUploadButton.addEventListener('click', handleBulkUploadClick);
     }
-    if (refs.bulkUploadInput) {
-      refs.bulkUploadInput.addEventListener('change', handleBulkUploadInputChange);
+    if (refs.bulkConsoleFileInput) {
+      refs.bulkConsoleFileInput.addEventListener('change', handleBulkConsoleFileChange);
+    }
+    if (refs.bulkConsoleProcessButton) {
+      refs.bulkConsoleProcessButton.addEventListener('click', handleBulkConsoleProcessClick);
+    }
+    if (refs.bulkConsoleCloseButton) {
+      refs.bulkConsoleCloseButton.addEventListener('click', handleBulkConsoleCloseClick);
     }
     if (refs.newRecordButton) {
       refs.newRecordButton.addEventListener('click', function () {
