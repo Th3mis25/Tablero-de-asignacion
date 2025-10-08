@@ -4338,7 +4338,9 @@
     DEFAULT_LOCALE: DEFAULT_LOCALE,
     formatHeaderLabel: formatHeaderLabel,
     prepareBulkRows: prepareBulkRows,
-    extractSheetRows: extractSheetRows
+    extractSheetRows: extractSheetRows,
+    resolveWorkbookPath: resolveWorkbookPath,
+    parseXlsxRows: parseXlsxRows
   };
 
   if (typeof module !== 'undefined' && module.exports) {
