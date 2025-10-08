@@ -148,7 +148,6 @@ function doPost(e) {
       var citaEntregaDate = parseDateSafe(p.citaEntrega, timeZone);
       var llegadaEntregaDate = parseDateSafe(p.llegadaEntrega, timeZone);
       var ejecutivo = (p.ejecutivo || p.Ejecutivo || '').trim();
-      if (!ejecutivo) throw new Error('Missing ejecutivo');
       var row = new Array(headers.length).fill('');
       var map = {
         'Ejecutivo': ejecutivo,
@@ -236,9 +235,6 @@ function doPost(e) {
         } else if (Number(tripKey) < 225000) {
           rowIssues.push('Trip menor a 225000');
         }
-        if (!ejecutivoKey) {
-          rowIssues.push('Ejecutivo vacío');
-        }
         if (rowIssues.length > 0) {
           invalidRows.push('Fila ' + (rowIndex + 2) + ': ' + rowIssues.join(', ') + '.');
           continue;
@@ -294,7 +290,6 @@ function doPost(e) {
       }
       // Parse dates using the sheet timezone to keep the submitted local time without adding offsets
       var ejecutivo = (p.ejecutivo || p.Ejecutivo || '').trim();
-      if (!ejecutivo) throw new Error('Missing ejecutivo');
       var citaCarga = parseDateSafe(p.citaCarga, timeZone);
       var llegadaCarga = parseDateSafe(p.llegadaCarga, timeZone);
       var citaEntrega = parseDateSafe(p.citaEntrega, timeZone);
@@ -331,7 +326,6 @@ function doPost(e) {
   } catch (err) {
     var status = (
       err.message === 'Trip not found' ||
-      err.message === 'Missing ejecutivo' ||
       err.message === 'Invalid trip' ||
       err.message === 'Trip must be >= 225000' ||
       err.message === 'Trip already exists'
