@@ -1145,6 +1145,26 @@
   }
 
   const BULK_ALLOWED_EXTENSIONS = new Set(['xlsx', 'xlsm']);
+
+  function formatAllowedExtensionsMessage(allowedExtensions) {
+    const extensions = Array.from(allowedExtensions, (ext) => `.${ext}`);
+    if (extensions.length === 0) {
+      return '';
+    }
+    if (extensions.length === 1) {
+      return extensions[0];
+    }
+    if (extensions.length === 2) {
+      return `${extensions[0]} o ${extensions[1]}`;
+    }
+    const head = extensions.slice(0, -1).join(', ');
+    const tail = extensions.at(-1);
+    return `${head} o ${tail}`;
+  }
+
+  const BULK_ALLOWED_EXTENSIONS_MESSAGE = formatAllowedExtensionsMessage(
+    BULK_ALLOWED_EXTENSIONS,
+  );
   const BULK_REQUIRED_HEADERS = ['Trip'];
   const BULK_TEXT_HEADERS = [
     'Ejecutivo',
@@ -2315,7 +2335,10 @@
       }
       const extension = getFileExtension(file.name);
       if (!BULK_ALLOWED_EXTENSIONS.has(extension)) {
-        setStatus('El archivo debe estar en formato .xlsx o .xlsm.', 'error');
+        setStatus(
+          `El archivo debe estar en formato ${BULK_ALLOWED_EXTENSIONS_MESSAGE}.`,
+          'error',
+        );
         return;
       }
       if (!state.currentUser) {
