@@ -1146,6 +1146,13 @@
 
   const BULK_ALLOWED_EXTENSIONS = new Set(['xlsx', 'xlsm']);
 
+  const BULK_REJECTED_EXTENSIONS = new Map([
+    [
+      'zip',
+      'Los archivos ZIP ya no son compatibles con la carga masiva. Utiliza un archivo .xlsx.'
+    ]
+  ]);
+
   function formatAllowedExtensionsMessage(allowedExtensions) {
     const extensions = Array.from(allowedExtensions, (ext) => `.${ext}`);
     if (extensions.length === 0) {
@@ -2630,6 +2637,16 @@
       }
 
       const extension = getFileExtension(file.name);
+      if (BULK_REJECTED_EXTENSIONS.has(extension)) {
+        const message = BULK_REJECTED_EXTENSIONS.get(extension);
+        const error = new Error(message);
+        setStatus(message, 'error');
+        emitLog(message, 'error');
+        emitError(error);
+        finish({ success: false, error: error });
+        return { success: false, error: error };
+      }
+
       if (!BULK_ALLOWED_EXTENSIONS.has(extension)) {
         const message = `El archivo debe estar en formato ${BULK_ALLOWED_EXTENSIONS_MESSAGE}.`;
         const error = new Error(message);

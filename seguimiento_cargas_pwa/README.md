@@ -17,6 +17,7 @@ Aplicación PWA para seguimiento de cargas en tiempo real, conectada a Google Sh
 - Columnas esperadas:
   - Trip, Caja, Referencia, Cliente, Destino, Estatus, Segmento, TR-MX, TR-USA, Cita carga, Llegada carga, Cita entrega, Llegada entrega, Comentarios, Docs, Tracking
 - Las fechas deben enviarse en formato `DD/MM/YYYY HH:mm:ss` (ejemplo: `26/08/2025 22:00:00`).
+- La carga masiva ahora acepta únicamente archivos de Excel con extensión `.xlsx` (o `.xlsm`). Los archivos `.zip` dejaron de ser compatibles.
 
 ## Inicio de sesión y control de acceso
 
