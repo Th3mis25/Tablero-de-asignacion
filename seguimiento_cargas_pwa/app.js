@@ -1406,6 +1406,76 @@
     return index - 1;
   }
 
+  function getXmlSpaceAttribute(node) {
+    if (!node || typeof node.getAttribute !== 'function') {
+      return '';
+    }
+    const direct = node.getAttribute('xml:space');
+    if (direct != null) {
+      return String(direct);
+    }
+    if (typeof node.getAttributeNS === 'function') {
+      const namespaced = node.getAttributeNS('http://www.w3.org/XML/1998/namespace', 'space');
+      if (namespaced != null) {
+        return String(namespaced);
+      }
+    }
+    return '';
+  }
+
+  function extractInlineStringValue(cellNode) {
+    if (!cellNode || typeof cellNode.getElementsByTagName !== 'function') {
+      return '';
+    }
+    const collected = [];
+    let preserveWhitespace = false;
+
+    function collectTextNodes(nodes) {
+      if (!nodes || typeof nodes.length !== 'number') {
+        return;
+      }
+      for (let k = 0; k < nodes.length; k++) {
+        const textNode = nodes[k];
+        if (!textNode) {
+          continue;
+        }
+        const xmlSpace = getXmlSpaceAttribute(textNode);
+        if (typeof xmlSpace === 'string' && xmlSpace.toLowerCase() === 'preserve') {
+          preserveWhitespace = true;
+        }
+        const raw = textNode.textContent != null ? String(textNode.textContent) : '';
+        if (raw) {
+          collected.push(raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
+        } else {
+          collected.push('');
+        }
+      }
+    }
+
+    const inlineNodes = cellNode.getElementsByTagName('is');
+    if (inlineNodes && inlineNodes.length > 0) {
+      for (let i = 0; i < inlineNodes.length; i++) {
+        const inlineNode = inlineNodes[i];
+        const tNodes = inlineNode && typeof inlineNode.getElementsByTagName === 'function'
+          ? inlineNode.getElementsByTagName('t')
+          : null;
+        collectTextNodes(tNodes);
+      }
+    } else {
+      collectTextNodes(cellNode.getElementsByTagName('t'));
+    }
+
+    if (collected.length === 0) {
+      return '';
+    }
+    const joined = collected.join('');
+    if (preserveWhitespace) {
+      return joined;
+    }
+    const trimmed = joined.trim();
+    return trimmed.length === joined.length ? trimmed : joined;
+  }
+
   function parseSharedStringsXml(xmlText) {
     const doc = parseXmlDocument(xmlText);
     const siNodes = doc.getElementsByTagName('si');
@@ -1531,6 +1601,8 @@
         const valueNode = cellNode.getElementsByTagName('v')[0];
         if (valueNode && valueNode.textContent != null) {
           value = valueNode.textContent;
+        } else if (type === 'inlineStr' || type === 'str') {
+          value = extractInlineStringValue(cellNode);
         }
         if (type === 's') {
           const sharedIndex = parseInt(value, 10);
@@ -1541,7 +1613,12 @@
           }
         } else if (type === 'b') {
           value = value === '1' ? true : value === '0' ? false : '';
-        } else if (value && !Number.isNaN(Number(value))) {
+        } else if (
+          value &&
+          type !== 'inlineStr' &&
+          type !== 'str' &&
+          !Number.isNaN(Number(value))
+        ) {
           const numeric = Number(value);
           if (isDateStyle(styleIndex, stylesInfo)) {
             const dateValue = excelSerialToDate(numeric);
@@ -1549,6 +1626,8 @@
           } else {
             value = numeric;
           }
+        } else if (type === 'inlineStr' || type === 'str') {
+          value = value == null ? '' : String(value);
         }
         row[index != null ? index : j] = value;
       }
@@ -4111,7 +4190,8 @@
     fmtDate: fmtDate,
     DEFAULT_LOCALE: DEFAULT_LOCALE,
     formatHeaderLabel: formatHeaderLabel,
-    prepareBulkRows: prepareBulkRows
+    prepareBulkRows: prepareBulkRows,
+    extractSheetRows: extractSheetRows
   };
 
   if (typeof module !== 'undefined' && module.exports) {
