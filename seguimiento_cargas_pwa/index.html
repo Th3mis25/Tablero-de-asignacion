@@ -38,7 +38,6 @@
         </button>
         <button type="button" class="button button--secondary is-hidden" data-action="change-token">Cambiar token</button>
         <button type="button" class="button button--secondary" data-action="refresh">Actualizar</button>
-        <button type="button" class="button button--secondary" data-action="bulk-upload">Carga masiva</button>
         <button type="button" class="button button--primary" data-action="new-record">Nuevo registro</button>
         <button type="button" class="button button--secondary" data-action="logout">Cerrar sesión</button>
       </div>
@@ -154,58 +153,6 @@
   <div class="copy-toast" data-copy-toast hidden aria-live="polite">Copiado</div>
 
   <div class="modal-backdrop hidden" data-backdrop></div>
-
-  <section
-    class="bulk-console hidden"
-    data-bulk-console
-    aria-modal="true"
-    role="dialog"
-    aria-labelledby="bulkConsoleTitle"
-    aria-hidden="true"
-  >
-    <div class="bulk-console__window">
-      <header class="bulk-console__header">
-        <h2 id="bulkConsoleTitle">Carga masiva</h2>
-        <button
-          type="button"
-          class="bulk-console__close"
-          data-action="close-bulk-console"
-          aria-label="Cerrar consola de carga"
-        >
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </header>
-      <div class="bulk-console__body">
-        <div class="bulk-console__controls">
-          <label class="bulk-console__file-picker" for="bulkConsoleFile">
-            <span class="bulk-console__label">Archivo de Excel</span>
-            <input
-              id="bulkConsoleFile"
-              type="file"
-              accept=".xlsx,.xlsm"
-              data-bulk-console-file-input
-              class="bulk-console__file-input"
-            />
-          </label>
-          <button
-            type="button"
-            class="button button--primary"
-            data-action="bulk-console-process"
-            disabled
-          >
-            Procesar
-          </button>
-        </div>
-        <div
-          class="bulk-console__log"
-          data-bulk-console-log
-          role="log"
-          aria-live="polite"
-          aria-label="Mensajes de procesamiento de carga masiva"
-        ></div>
-      </div>
-    </div>
-  </section>
 
   <section class="edit-modal hidden" data-edit-modal aria-modal="true" role="dialog" aria-labelledby="editTitle">
     <form class="edit-modal__form" data-edit-form novalidate>
