@@ -2098,10 +2098,6 @@
       tableBody: doc.querySelector('[data-table-body]'),
       tableViewport: doc.querySelector('[data-table-viewport]'),
       tableElement: doc.querySelector('[data-table]'),
-      dashboard: doc.querySelector('[data-dashboard]'),
-      dashboardMetrics: doc.querySelector('[data-dashboard-metrics]'),
-      dashboardExportButton: doc.querySelector('[data-action="dashboard-export"]'),
-      dashboardShareButton: doc.querySelector('[data-action="dashboard-share"]'),
       loadingIndicator: doc.querySelector('[data-loading-indicator]'),
       viewMenu: doc.querySelector('[data-view-menu]'),
       status: doc.querySelector('[data-status]'),
@@ -2180,7 +2176,6 @@
       autoRefreshEnabled: initialAutoRefreshEnabled,
       autoRefreshTimer: null,
       lastDataSnapshot: null,
-      lastRenderedSnapshot: null,
       filters: {
         searchText: '',
         dateRange: null,
@@ -2188,8 +2183,7 @@
       },
       availableStatuses: [],
       isDatePopoverOpen: false,
-      isStatusPopoverOpen: false,
-      dashboardSummary: null
+      isStatusPopoverOpen: false
     };
 
     let copyToastTimeoutId = null;
@@ -2551,43 +2545,6 @@
       }
     }
 
-    function shareMessageToWhatsapp(message) {
-      const text = typeof message === 'string' ? message.trim() : '';
-      if (!text) {
-        setStatus('No se pudo preparar el mensaje para WhatsApp.', 'error');
-        return false;
-      }
-      const whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(text);
-      let openedWindow = null;
-      if (typeof global.open === 'function') {
-        try {
-          openedWindow = global.open(whatsappUrl, '_blank');
-          if (openedWindow && typeof openedWindow === 'object') {
-            try {
-              openedWindow.opener = null;
-            } catch (err) {
-              // Ignora errores de acceso entre ventanas (cross-origin).
-            }
-          }
-        } catch (err) {
-          openedWindow = null;
-        }
-      }
-      if (!openedWindow && global.location && typeof global.location.assign === 'function') {
-        try {
-          global.location.assign(whatsappUrl);
-          return true;
-        } catch (err) {
-          openedWindow = null;
-        }
-      }
-      if (!openedWindow) {
-        setStatus('No se pudo abrir WhatsApp. Permite las ventanas emergentes e inténtalo de nuevo.', 'error');
-        return false;
-      }
-      return true;
-    }
-
     function shareRowInfoToWhatsapp(dataIndex, options) {
       const config = Object.assign({
         valueKey: 'trusa',
@@ -2617,7 +2574,25 @@
         trailerLabel + ': ' + trailerValue,
         'Tracking: ' + tracking
       ].join('\n');
-      shareMessageToWhatsapp(message);
+      const whatsappUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
+      let openedWindow = null;
+      if (typeof global.open === 'function') {
+        try {
+          openedWindow = global.open(whatsappUrl, '_blank');
+          if (openedWindow && typeof openedWindow === 'object') {
+            try {
+              openedWindow.opener = null;
+            } catch (err) {
+              // Ignora errores de acceso entre ventanas (cross-origin).
+            }
+          }
+        } catch (err) {
+          openedWindow = null;
+        }
+      }
+      if (!openedWindow) {
+        setStatus('No se pudo abrir WhatsApp. Permite las ventanas emergentes e inténtalo de nuevo.', 'error');
+      }
     }
 
     async function processBulkUploadFile(file, options) {
@@ -3785,12 +3760,9 @@
       }
 
       clearTable();
-      state.lastRenderedSnapshot = null;
 
       if (!Array.isArray(state.data) || state.data.length === 0) {
         updateAvailableStatuses([]);
-        state.dashboardSummary = null;
-        updateDashboardSummary(null);
         setStatus('No hay datos disponibles en la hoja.', 'info');
         scheduleTableZoomUpdate();
         return;
@@ -4239,29 +4211,6 @@
 
       refs.tableBody.appendChild(fragment);
 
-      const snapshotRows = rowsToRender.map(function (entry) {
-        const rowValues = Array.isArray(entry.row) ? entry.row : [];
-        const normalized = new Array(columnCount);
-        for (let i = 0; i < columnCount; i++) {
-          normalized[i] = i < rowValues.length ? rowValues[i] : '';
-        }
-        return {
-          dataIndex: entry.dataIndex,
-          values: normalized
-        };
-      });
-
-      const snapshot = {
-        headers: headers.slice(),
-        columnCount: columnCount,
-        rows: snapshotRows,
-        statusColumnIndex: statusColumnIndex,
-        totalRows: dataRows.length
-      };
-
-      state.lastRenderedSnapshot = snapshot;
-      updateDashboardSummary(snapshot);
-
       scheduleTableZoomUpdate();
 
       if (rowsToRender.length === 0) {
@@ -4270,339 +4219,6 @@
         setStatus('Sincronizado', 'success');
       }
 
-    }
-
-    function formatNumberForLocale(value) {
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        if (global.Intl && typeof global.Intl.NumberFormat === 'function') {
-          try {
-            const formatter = new global.Intl.NumberFormat(state.locale || DEFAULT_LOCALE);
-            return formatter.format(value);
-          } catch (err) {
-            return String(value);
-          }
-        }
-        return String(value);
-      }
-      if (value == null) {
-        return '0';
-      }
-      return String(value);
-    }
-
-    function createDashboardCard(label, value, options) {
-      if (!doc) {
-        return null;
-      }
-      const config = options || {};
-      const card = doc.createElement('article');
-      card.className = 'sheet-dashboard__card';
-      if (config.modifier) {
-        card.classList.add('sheet-dashboard__card--' + config.modifier);
-      }
-      const valueElement = doc.createElement('div');
-      valueElement.className = 'sheet-dashboard__value';
-      const formatted = config.formatValue ? config.formatValue(value) : formatNumberForLocale(value);
-      valueElement.textContent = formatted;
-      const labelElement = doc.createElement('div');
-      labelElement.className = 'sheet-dashboard__label';
-      labelElement.textContent = label;
-      card.appendChild(valueElement);
-      card.appendChild(labelElement);
-      return card;
-    }
-
-    function updateDashboardSummary(snapshot) {
-      if (!refs.dashboard) {
-        return;
-      }
-      const metricsContainer = refs.dashboardMetrics || refs.dashboard;
-      if (metricsContainer) {
-        metricsContainer.innerHTML = '';
-      }
-
-      if (!snapshot || !metricsContainer) {
-        if (refs.dashboard) {
-          refs.dashboard.classList.add('is-empty');
-        }
-        if (metricsContainer) {
-          const empty = doc.createElement('p');
-          empty.className = 'sheet-dashboard__empty';
-          empty.textContent = 'Sin datos disponibles.';
-          metricsContainer.appendChild(empty);
-        }
-        if (refs.dashboardExportButton) {
-          refs.dashboardExportButton.disabled = true;
-        }
-        if (refs.dashboardShareButton) {
-          refs.dashboardShareButton.disabled = true;
-        }
-        state.dashboardSummary = null;
-        return;
-      }
-
-      refs.dashboard.classList.remove('is-empty');
-      if (refs.dashboardExportButton) {
-        refs.dashboardExportButton.disabled = false;
-      }
-      if (refs.dashboardShareButton) {
-        refs.dashboardShareButton.disabled = false;
-      }
-
-      const filteredCount = Array.isArray(snapshot.rows) ? snapshot.rows.length : 0;
-      const totalCount = typeof snapshot.totalRows === 'number' ? snapshot.totalRows : 0;
-      const statusIndex = typeof snapshot.statusColumnIndex === 'number' ? snapshot.statusColumnIndex : -1;
-      const countsByStatus = new Map();
-      let emptyStatusCount = 0;
-
-      if (statusIndex >= 0 && Array.isArray(snapshot.rows)) {
-        snapshot.rows.forEach(function (entry) {
-          const values = entry && Array.isArray(entry.values) ? entry.values : [];
-          const rawStatus = statusIndex < values.length ? values[statusIndex] : '';
-          const normalized = normalizeStatusValue(rawStatus);
-          if (!normalized) {
-            emptyStatusCount += 1;
-            return;
-          }
-          const canonical = state.availableStatuses.find(function (status) {
-            return isSameStatus(status, normalized);
-          }) || normalized;
-          const key = canonical.toLowerCase();
-          const existing = countsByStatus.get(key);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            countsByStatus.set(key, {
-              label: canonical,
-              count: 1
-            });
-          }
-        });
-      }
-
-      const statusItems = [];
-      state.availableStatuses.forEach(function (status) {
-        const key = status.toLowerCase();
-        const entry = countsByStatus.get(key);
-        statusItems.push({
-          label: status,
-          count: entry ? entry.count : 0
-        });
-        countsByStatus.delete(key);
-      });
-
-      countsByStatus.forEach(function (value) {
-        statusItems.push({ label: value.label, count: value.count });
-      });
-
-      if (emptyStatusCount > 0) {
-        statusItems.push({ label: 'Sin estatus', count: emptyStatusCount });
-      }
-
-      const fragment = doc.createDocumentFragment();
-      const numberFormatter = function (value) {
-        return formatNumberForLocale(value);
-      };
-      const totalCard = createDashboardCard('Total (hoja)', totalCount, {
-        formatValue: numberFormatter,
-        modifier: 'total'
-      });
-      const filteredCard = createDashboardCard('Total filtrado', filteredCount, {
-        formatValue: numberFormatter,
-        modifier: 'filtered'
-      });
-      if (totalCard) {
-        fragment.appendChild(totalCard);
-      }
-      if (filteredCard) {
-        fragment.appendChild(filteredCard);
-      }
-
-      statusItems.forEach(function (item) {
-        const card = createDashboardCard(item.label, item.count, {
-          formatValue: numberFormatter
-        });
-        if (card) {
-          fragment.appendChild(card);
-        }
-      });
-
-      metricsContainer.appendChild(fragment);
-
-      state.dashboardSummary = {
-        totalCount: totalCount,
-        filteredCount: filteredCount,
-        statusItems: statusItems,
-        generatedAt: new Date()
-      };
-    }
-
-    function getDashboardSummaryLines() {
-      if (!state.dashboardSummary) {
-        return [];
-      }
-      const summary = state.dashboardSummary;
-      const lines = [];
-      lines.push('Total (hoja): ' + formatNumberForLocale(summary.totalCount));
-      lines.push('Total filtrado: ' + formatNumberForLocale(summary.filteredCount));
-      summary.statusItems.forEach(function (item) {
-        lines.push(item.label + ': ' + formatNumberForLocale(item.count));
-      });
-      const generatedAt = summary.generatedAt;
-      if (generatedAt instanceof Date && !Number.isNaN(generatedAt.getTime())) {
-        let timeLabel = '';
-        if (global.Intl && typeof global.Intl.DateTimeFormat === 'function') {
-          try {
-            const timeFormatter = new global.Intl.DateTimeFormat(state.locale || DEFAULT_LOCALE, {
-              hour: '2-digit',
-              minute: '2-digit'
-            });
-            timeLabel = timeFormatter.format(generatedAt);
-          } catch (err) {
-            timeLabel = generatedAt.toLocaleTimeString();
-          }
-        } else if (typeof generatedAt.toLocaleTimeString === 'function') {
-          timeLabel = generatedAt.toLocaleTimeString();
-        }
-        const dateText = fmtDate(generatedAt, state.locale);
-        const timestampLine = timeLabel ? dateText + ' ' + timeLabel : dateText;
-        lines.push('Generado: ' + timestampLine.trim());
-      }
-      return lines;
-    }
-
-    function buildCsvContent(snapshot) {
-      if (!snapshot || !Array.isArray(snapshot.rows)) {
-        return '';
-      }
-      const columnCount = Math.max(
-        typeof snapshot.columnCount === 'number' ? snapshot.columnCount : 0,
-        Array.isArray(snapshot.headers) ? snapshot.headers.length : 0
-      );
-      if (columnCount === 0) {
-        return '';
-      }
-      const headers = Array.isArray(snapshot.headers) ? snapshot.headers.slice() : [];
-      const headerRow = [];
-      for (let i = 0; i < columnCount; i++) {
-        const rawHeader = i < headers.length ? headers[i] : '';
-        const baseLabel = rawHeader != null && rawHeader !== '' ? rawHeader : columnLetter(i);
-        const formattedLabel = formatHeaderLabel(baseLabel) || columnLetter(i);
-        headerRow.push(formattedLabel);
-      }
-
-      const rows = snapshot.rows.map(function (entry) {
-        const values = entry && Array.isArray(entry.values) ? entry.values : [];
-        const output = new Array(columnCount);
-        for (let i = 0; i < columnCount; i++) {
-          const rawCell = i < values.length ? values[i] : '';
-          const displayValue = getCellDisplayValue(rawCell);
-          if (displayValue instanceof Date) {
-            output[i] = fmtDate(displayValue, state.locale);
-          } else if (displayValue == null) {
-            output[i] = '';
-          } else {
-            output[i] = String(displayValue);
-          }
-        }
-        return output;
-      });
-
-      const allRows = [headerRow].concat(rows);
-      return allRows
-        .map(function (row) {
-          return row
-            .map(function (cell) {
-              const text = cell == null ? '' : String(cell);
-              if (/[",\n\r]/.test(text)) {
-                return '"' + text.replace(/"/g, '""') + '"';
-              }
-              return text;
-            })
-            .join(',');
-        })
-        .join('\r\n');
-    }
-
-    async function handleDashboardExport(event) {
-      if (event) {
-        event.preventDefault();
-      }
-      const snapshot = state.lastRenderedSnapshot;
-      if (!snapshot) {
-        setStatus('No hay datos para exportar.', 'info');
-        return;
-      }
-
-      const csvContent = buildCsvContent(snapshot);
-      let downloadSuccessful = false;
-
-      if (csvContent) {
-        const filenameDate = new Date();
-        const dateStamp = filenameDate instanceof Date && !Number.isNaN(filenameDate.getTime())
-          ? filenameDate.toISOString().replace(/[:.]/g, '-').slice(0, 19)
-          : 'reporte';
-        const filename = 'reporte-seguimiento-' + dateStamp + '.csv';
-        if (typeof global.Blob === 'function' && doc && doc.body) {
-          try {
-            const blob = new global.Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const urlCreator = global.URL && typeof global.URL.createObjectURL === 'function'
-              ? global.URL
-              : null;
-            if (urlCreator) {
-              const objectUrl = urlCreator.createObjectURL(blob);
-              const link = doc.createElement('a');
-              link.href = objectUrl;
-              link.download = filename;
-              link.style.display = 'none';
-              doc.body.appendChild(link);
-              link.click();
-              doc.body.removeChild(link);
-              if (typeof urlCreator.revokeObjectURL === 'function') {
-                urlCreator.revokeObjectURL(objectUrl);
-              }
-              downloadSuccessful = true;
-              setStatus('Reporte descargado.', 'success');
-            }
-          } catch (err) {
-            downloadSuccessful = false;
-          }
-        }
-      }
-
-      if (downloadSuccessful) {
-        return;
-      }
-
-      const lines = getDashboardSummaryLines();
-      if (lines.length === 0) {
-        setStatus('No se pudo generar el reporte.', 'error');
-        return;
-      }
-
-      try {
-        await copyTextToClipboard(lines.join('\n'));
-        showCopyToast('Resumen copiado');
-        setStatus('Resumen copiado al portapapeles.', 'success');
-      } catch (err) {
-        setStatus('No se pudo generar el reporte.', 'error');
-      }
-    }
-
-    function handleDashboardShare(event) {
-      if (event) {
-        event.preventDefault();
-      }
-      const lines = getDashboardSummaryLines();
-      if (lines.length === 0) {
-        setStatus('No hay información para compartir.', 'info');
-        return;
-      }
-      const messageLines = ['Resumen de cargas', ''];
-      Array.prototype.push.apply(messageLines, lines);
-      if (shareMessageToWhatsapp(messageLines.join('\n'))) {
-        setStatus('Abriendo WhatsApp con el resumen.', 'success');
-      }
     }
 
     scheduleTableZoomUpdate();
@@ -4944,9 +4560,6 @@
           state.currentUser = null;
           updateUserBadge();
           clearTable();
-          state.lastRenderedSnapshot = null;
-          state.dashboardSummary = null;
-          updateDashboardSummary(null);
           updateLastUpdated(null);
           closeEditModal();
           setStatus('Sesión expirada. Inicia sesión nuevamente.', 'error');
@@ -5025,9 +4638,6 @@
       updateUserBadge();
       setStatus('Sesión cerrada. Vuelve a iniciar sesión para ver la hoja.', 'info');
       clearTable();
-      state.lastRenderedSnapshot = null;
-      state.dashboardSummary = null;
-      updateDashboardSummary(null);
       updateLastUpdated(null);
       showLoginModal();
       stopAutoRefresh();
@@ -5327,12 +4937,6 @@
     if (refs.bulkConsoleCloseButton) {
       refs.bulkConsoleCloseButton.addEventListener('click', handleBulkConsoleCloseClick);
     }
-    if (refs.dashboardExportButton) {
-      refs.dashboardExportButton.addEventListener('click', handleDashboardExport);
-    }
-    if (refs.dashboardShareButton) {
-      refs.dashboardShareButton.addEventListener('click', handleDashboardShare);
-    }
     if (refs.newRecordButton) {
       refs.newRecordButton.addEventListener('click', function () {
         openCreateModal();
@@ -5383,8 +4987,6 @@
 
     doc.addEventListener('click', handleDocumentClick);
     doc.addEventListener('keydown', handleDocumentKeydown);
-
-    updateDashboardSummary(state.lastRenderedSnapshot);
 
     renderViewMenu();
 
