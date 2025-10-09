@@ -5,8 +5,10 @@
   const STORAGE_TOKEN_KEY = 'seguimiento_cargas_token';
   const STORAGE_USER_KEY = 'seguimiento_cargas_user';
   const STORAGE_THEME_KEY = 'seguimiento_cargas_theme';
+  const STORAGE_AUTO_REFRESH_KEY = 'seguimiento_cargas_auto_refresh';
   const THEME_LIGHT = 'light';
   const THEME_DARK = 'dark';
+  const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
   const DATE_HEADER_REGEX = /(fecha|cita|llegada|salida|hora)/i;
   const COLUMN_CONFIG = [
     { key: 'trip', label: 'Trip' },
@@ -2140,7 +2142,8 @@
       editTitle: doc.querySelector('[data-edit-title]'),
       editHint: doc.querySelector('[data-edit-hint]'),
       editSubmitButton: doc.querySelector('[data-edit-submit]'),
-      copyToast: doc.querySelector('[data-copy-toast]')
+      copyToast: doc.querySelector('[data-copy-toast]'),
+      autoRefreshButton: doc.querySelector('[data-auto-refresh]')
     };
 
     const rawStoredTheme = getStoredValue(STORAGE_THEME_KEY);
@@ -2154,6 +2157,10 @@
         ? THEME_DARK
         : THEME_LIGHT;
 
+    const rawStoredAutoRefresh = getStoredValue(STORAGE_AUTO_REFRESH_KEY);
+    const normalizedAutoRefresh = rawStoredAutoRefresh ? String(rawStoredAutoRefresh).trim().toLowerCase() : '';
+    const initialAutoRefreshEnabled = normalizedAutoRefresh === '1' || normalizedAutoRefresh === 'true';
+
     const state = {
       config: global.APP_CONFIG || { API_BASE: '', SECURE_CONFIG_URL: '' },
       token: '',
@@ -2166,6 +2173,9 @@
       editingRecord: null,
       currentViewId: TABLE_VIEWS[0] ? TABLE_VIEWS[0].id : 'all',
       theme: initialTheme,
+      autoRefreshEnabled: initialAutoRefreshEnabled,
+      autoRefreshTimer: null,
+      lastDataSnapshot: null,
       filters: {
         searchText: '',
         dateRange: null,
@@ -2207,6 +2217,26 @@
       setTheme(isChecked ? THEME_DARK : THEME_LIGHT);
     }
 
+    function handleAutoRefreshToggle() {
+      state.autoRefreshEnabled = !state.autoRefreshEnabled;
+      persistAutoRefreshPreference(state.autoRefreshEnabled);
+      updateAutoRefreshButton();
+      if (state.autoRefreshEnabled) {
+        if (state.currentUser && state.token) {
+          startAutoRefresh();
+          if (!state.loading) {
+            loadData();
+          }
+          showCopyToast('Auto actualización activada.');
+        } else {
+          showCopyToast('Auto actualización activada. Inicia sesión para sincronizar.');
+        }
+      } else {
+        stopAutoRefresh();
+        showCopyToast('Auto actualización desactivada.');
+      }
+    }
+
     function handleSystemThemeChange(event) {
       if (hasStoredTheme) {
         return;
@@ -2216,6 +2246,7 @@
     }
 
     setTheme(initialTheme, { persist: false });
+    updateAutoRefreshButton();
 
     if (prefersDarkMedia) {
       if (typeof prefersDarkMedia.addEventListener === 'function') {
@@ -3617,6 +3648,50 @@
       refs.currentUser.textContent = `Usuario: ${state.currentUser.displayName || state.currentUser.username}`;
     }
 
+    function formatAutoRefreshIntervalLabel() {
+      const minutes = Math.round(AUTO_REFRESH_INTERVAL_MS / 60000);
+      if (minutes >= 1) {
+        return minutes === 1 ? '1 minuto' : `${minutes} minutos`;
+      }
+      const seconds = Math.round(AUTO_REFRESH_INTERVAL_MS / 1000);
+      return seconds === 1 ? '1 segundo' : `${seconds} segundos`;
+    }
+
+    function updateAutoRefreshButton() {
+      if (!refs.autoRefreshButton) {
+        return;
+      }
+      const statusLabel = state.autoRefreshEnabled ? 'Activada' : 'Desactivada';
+      const intervalLabel = formatAutoRefreshIntervalLabel();
+      refs.autoRefreshButton.textContent = `Auto actualización (${intervalLabel}): ${statusLabel}`;
+      refs.autoRefreshButton.setAttribute('aria-pressed', state.autoRefreshEnabled ? 'true' : 'false');
+      refs.autoRefreshButton.setAttribute('aria-label', `Auto actualización ${statusLabel.toLowerCase()} (${intervalLabel})`);
+    }
+
+    function persistAutoRefreshPreference(enabled) {
+      setStoredValue(STORAGE_AUTO_REFRESH_KEY, enabled ? '1' : '0');
+    }
+
+    function stopAutoRefresh() {
+      if (state.autoRefreshTimer) {
+        global.clearInterval(state.autoRefreshTimer);
+        state.autoRefreshTimer = null;
+      }
+    }
+
+    function startAutoRefresh() {
+      stopAutoRefresh();
+      if (!state.autoRefreshEnabled || !state.currentUser || !state.token) {
+        return;
+      }
+      state.autoRefreshTimer = global.setInterval(function () {
+        if (state.loading) {
+          return;
+        }
+        loadData();
+      }, AUTO_REFRESH_INTERVAL_MS);
+    }
+
     function toggleLoading(isLoading) {
       state.loading = isLoading;
       if (refs.refreshButton) {
@@ -4545,6 +4620,13 @@
       updateUserBadge();
       hideLoginModal();
       setStatus(`Sesión iniciada como ${match.displayName}.`, 'success');
+      state.lastDataSnapshot = null;
+      if (state.autoRefreshEnabled) {
+        startAutoRefresh();
+      } else {
+        stopAutoRefresh();
+      }
+      updateAutoRefreshButton();
       loadData();
     }
 
@@ -4558,6 +4640,8 @@
       clearTable();
       updateLastUpdated(null);
       showLoginModal();
+      stopAutoRefresh();
+      state.lastDataSnapshot = null;
     }
 
     function handleChangeToken() {
@@ -4580,14 +4664,203 @@
       }
     }
 
+    function extractOverdueRows(rows) {
+      if (!Array.isArray(rows) || rows.length < 2) {
+        return [];
+      }
+
+      const headers = Array.isArray(rows[0]) ? rows[0] : [];
+      const columnKeys = headers.map(function (header) {
+        return getColumnKeyFromHeader(header);
+      });
+      const columnMap = {};
+      columnKeys.forEach(function (key, index) {
+        if (key) {
+          columnMap[key] = index;
+        }
+      });
+
+      const citaIndex = typeof columnMap.citaCarga === 'number' && columnMap.citaCarga >= 0 ? columnMap.citaCarga : null;
+      if (citaIndex == null) {
+        return [];
+      }
+
+      const llegadaIndex = typeof columnMap.llegadaCarga === 'number' && columnMap.llegadaCarga >= 0 ? columnMap.llegadaCarga : null;
+      const tripIndex = typeof columnMap.trip === 'number' && columnMap.trip >= 0 ? columnMap.trip : null;
+      const referenciaIndex = typeof columnMap.referencia === 'number' && columnMap.referencia >= 0 ? columnMap.referencia : null;
+      const clienteIndex = typeof columnMap.cliente === 'number' && columnMap.cliente >= 0 ? columnMap.cliente : null;
+
+      const now = new Date();
+      const referenceTime = isValidDate(now) ? now.getTime() : Date.now();
+
+      const results = [];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (!Array.isArray(row) || citaIndex >= row.length) {
+          continue;
+        }
+        const rawCitaCarga = row[citaIndex];
+        if (rawCitaCarga == null || rawCitaCarga === '') {
+          continue;
+        }
+        const citaDate = parseDateValue(rawCitaCarga);
+        if (!isValidDate(citaDate)) {
+          continue;
+        }
+        if (citaDate.getTime() >= referenceTime) {
+          continue;
+        }
+        let hasLlegadaCarga = false;
+        if (llegadaIndex != null && llegadaIndex < row.length) {
+          const llegadaValue = row[llegadaIndex];
+          hasLlegadaCarga = llegadaValue != null && String(llegadaValue).trim() !== '';
+        }
+        if (hasLlegadaCarga) {
+          continue;
+        }
+        const tripValue = tripIndex != null && tripIndex < row.length ? row[tripIndex] : null;
+        const referenciaValue = referenciaIndex != null && referenciaIndex < row.length ? row[referenciaIndex] : null;
+        const clienteValue = clienteIndex != null && clienteIndex < row.length ? row[clienteIndex] : null;
+        const keyParts = [`idx:${i}`];
+        if (tripValue != null && tripValue !== '') {
+          keyParts.push(`trip:${String(tripValue).trim()}`);
+        }
+        keyParts.push(`cita:${String(rawCitaCarga).trim()}`);
+        const entry = {
+          key: keyParts.join('|'),
+          trip: tripValue != null ? String(tripValue).trim() : '',
+          citaCarga: rawCitaCarga,
+          referencia: referenciaValue != null ? String(referenciaValue).trim() : '',
+          cliente: clienteValue != null ? String(clienteValue).trim() : ''
+        };
+        results.push(entry);
+      }
+      return results;
+    }
+
+    function notifyOverdueLoads(overdueRows) {
+      if (!Array.isArray(overdueRows) || overdueRows.length === 0) {
+        return;
+      }
+
+      const highlighted = overdueRows
+        .map(function (row) {
+          return row && (row.trip || row.referencia || row.cliente);
+        })
+        .filter(function (value) {
+          return value != null && String(value).trim() !== '';
+        })
+        .slice(0, 3)
+        .map(function (value) {
+          return String(value).trim();
+        });
+
+      const summary = highlighted.length > 0 ? ` (${highlighted.join(', ')})` : '';
+      const message = overdueRows.length === 1
+        ? `Se detectó una cita de carga vencida${summary}.`
+        : `Se detectaron ${overdueRows.length} citas de carga vencidas${summary}.`;
+
+      const fallback = function () {
+        showCopyToast(message);
+      };
+
+      if (!global.Notification || !global.navigator || !global.navigator.serviceWorker) {
+        fallback();
+        return;
+      }
+
+      const showNotification = function () {
+        global.navigator.serviceWorker.getRegistration().then(function (registration) {
+          if (registration && typeof registration.showNotification === 'function') {
+            registration.showNotification('Citas de carga vencidas', {
+              body: message,
+              tag: 'seguimiento-cargas-overdue',
+              renotify: true,
+              data: {
+                timestamp: Date.now(),
+                total: overdueRows.length
+              }
+            });
+          } else {
+            fallback();
+          }
+        }).catch(function () {
+          fallback();
+        });
+      };
+
+      if (global.Notification.permission === 'granted') {
+        showNotification();
+        return;
+      }
+
+      if (global.Notification.permission === 'denied') {
+        fallback();
+        return;
+      }
+
+      try {
+        let handled = false;
+        const handlePermission = function (permission) {
+          if (handled) {
+            return;
+          }
+          handled = true;
+          if (permission === 'granted') {
+            showNotification();
+          } else {
+            fallback();
+          }
+        };
+        const permissionRequest = global.Notification.requestPermission(handlePermission);
+        if (permissionRequest && typeof permissionRequest.then === 'function') {
+          permissionRequest
+            .then(handlePermission)
+            .catch(function () {
+              handled = true;
+              fallback();
+            });
+        } else if (typeof permissionRequest === 'string') {
+          handlePermission(permissionRequest);
+        }
+      } catch (err) {
+        fallback();
+      }
+    }
+
+    function processOverdueLoads(rows) {
+      const overdueRows = extractOverdueRows(rows);
+      if (!state.lastDataSnapshot) {
+        state.lastDataSnapshot = { overdueKeys: overdueRows.map(function (row) { return row.key; }) };
+        return;
+      }
+
+      const previousKeys = Array.isArray(state.lastDataSnapshot.overdueKeys)
+        ? state.lastDataSnapshot.overdueKeys
+        : [];
+      const previousSet = new Set(previousKeys);
+      const newRows = overdueRows.filter(function (row) {
+        return row && !previousSet.has(row.key);
+      });
+      if (newRows.length > 0) {
+        notifyOverdueLoads(newRows);
+      }
+      state.lastDataSnapshot = { overdueKeys: overdueRows.map(function (row) { return row.key; }) };
+    }
+
     async function loadData() {
       if (!state.currentUser) {
+        stopAutoRefresh();
         showLoginModal();
         return;
       }
       if (!state.token) {
+        stopAutoRefresh();
         setStatus('No se encontró el token. Actualízalo para continuar.', 'error');
         showLoginModal();
+        return;
+      }
+      if (state.loading) {
         return;
       }
       toggleLoading(true);
@@ -4595,6 +4868,7 @@
       try {
         const rows = await fetchSheetData(state.config.API_BASE, state.token);
         state.data = rows;
+        processOverdueLoads(rows);
         renderTable();
         updateLastUpdated(new Date());
       } catch (err) {
@@ -4603,6 +4877,8 @@
         if (err && err.status === 401) {
           state.token = '';
           setStoredValue(STORAGE_TOKEN_KEY, null);
+          stopAutoRefresh();
+          state.lastDataSnapshot = null;
           showLoginModal();
         }
       } finally {
@@ -4674,6 +4950,9 @@
     }
     if (refs.themeSwitch) {
       refs.themeSwitch.addEventListener('change', handleThemeSwitchChange);
+    }
+    if (refs.autoRefreshButton) {
+      refs.autoRefreshButton.addEventListener('click', handleAutoRefreshToggle);
     }
     if (refs.filterSearchInput) {
       refs.filterSearchInput.addEventListener('input', handleFilterSearchInput);
