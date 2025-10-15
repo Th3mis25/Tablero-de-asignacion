@@ -1,0 +1,8 @@
+{
+  "name": "Tablero de seguimiento",
+  "short_name": "Tablero",
+  "start_url": "/seguimiento_cargas_pwa/",
+  "scope": "/seguimiento_cargas_pwa/",
+  "display": "standalone",
+  "background_color": "#082341",
+  "theme_color": "#0F2C5C"}
