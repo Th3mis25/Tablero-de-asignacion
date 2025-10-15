@@ -609,17 +609,6 @@
       return false;
     }
 
-    let rawStatus = null;
-    if (estatusIndex < row.length) {
-      rawStatus = row[estatusIndex];
-    }
-    if (rawStatus != null && rawStatus !== '') {
-      const normalizedStatus = String(rawStatus).trim().toLowerCase();
-      if (TODAY_DELIVERY_EXCLUDED_STATUS_SET.has(normalizedStatus)) {
-        return false;
-      }
-    }
-
     const now = context.now instanceof Date && !isNaN(context.now.getTime()) ? context.now : new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfTomorrow = new Date(startOfToday.getTime());
@@ -627,6 +616,16 @@
 
     let hasCitaEntrega = false;
     let isDue = false;
+    let isCitaEntregaToday = false;
+    let normalizedStatus = null;
+
+    let rawStatus = null;
+    if (estatusIndex < row.length) {
+      rawStatus = row[estatusIndex];
+      if (rawStatus != null && rawStatus !== '') {
+        normalizedStatus = String(rawStatus).trim().toLowerCase();
+      }
+    }
 
     if (citaEntregaIndex != null && citaEntregaIndex >= 0 && citaEntregaIndex < row.length) {
       const rawCita = row[citaEntregaIndex];
@@ -634,11 +633,18 @@
         const citaDate = parseDateValue(rawCita);
         if (citaDate) {
           hasCitaEntrega = true;
+          if (citaDate >= startOfToday && citaDate < startOfTomorrow) {
+            isCitaEntregaToday = true;
+          }
           if (citaDate < startOfTomorrow) {
             isDue = true;
           }
         }
       }
+    }
+
+    if (!isCitaEntregaToday && normalizedStatus != null && TODAY_DELIVERY_EXCLUDED_STATUS_SET.has(normalizedStatus)) {
+      return false;
     }
 
     if (!isDue && llegadaEntregaIndex != null && llegadaEntregaIndex >= 0 && llegadaEntregaIndex < row.length) {
