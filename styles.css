@@ -939,14 +939,12 @@ h6 {
 
 .sheet-grid__viewport {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: auto;
   max-height: calc(100vh - var(--size-220));
   flex: 1 1 auto;
   min-height: 0;
   position: relative;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x pan-y;
 }
 
 [data-loading-indicator] {
@@ -1004,10 +1002,6 @@ h6 {
 
 .sheet-table.is-zoomed {
   transform: scale(var(--table-scale));
-}
-
-.table-zoom-disabled .sheet-table {
-  transform: none !important;
 }
 
 .sheet-table thead th,
@@ -1693,17 +1687,13 @@ h6 {
   .sheet-app__controls .button {
     flex: 1 1 auto;
   }
+
+  .sheet-table {
+    min-width: var(--size-980);
+  }
 }
 
 @media (max-width: 600px) {
-  :root {
-    --app-scale: 0.92;
-    --font-size-xs: clamp(1rem, 0.98rem + 0.6vw, 1.15rem);
-    --font-size-sm: clamp(1.08rem, 1.02rem + 0.6vw, 1.24rem);
-    --font-size-md: clamp(1.2rem, 1.1rem + 0.65vw, 1.38rem);
-    --font-size-lg: clamp(1.32rem, 1.22rem + 0.7vw, 1.52rem);
-  }
-
   .sheet-app__toolbar {
     align-items: flex-start;
   }
@@ -1715,9 +1705,5 @@ h6 {
 
   .sheet-app__controls .button {
     width: 100%;
-  }
-
-  .sheet-table {
-    font-size: var(--font-size-sm);
   }
 }
