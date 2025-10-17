@@ -2190,6 +2190,19 @@
     let copyToastHideTimeoutId = null;
     let tableZoomAnimationFrameId = null;
     let tableResizeObserver = null;
+    const tableZoomDisableMediaQuery =
+      typeof global.matchMedia === 'function' ? global.matchMedia('(max-width: 900px)') : null;
+
+    function isTableZoomDisabled() {
+      return Boolean(tableZoomDisableMediaQuery && tableZoomDisableMediaQuery.matches);
+    }
+
+    function setTableZoomDisabledClass(isDisabled) {
+      if (!appRoot) {
+        return;
+      }
+      appRoot.classList.toggle('table-zoom-disabled', Boolean(isDisabled));
+    }
 
     function setTheme(theme, options) {
       const normalized = theme === THEME_DARK ? THEME_DARK : THEME_LIGHT;
@@ -3195,6 +3208,7 @@
     }
 
     function resetTableZoom() {
+      setTableZoomDisabledClass(isTableZoomDisabled());
       if (!refs.tableElement) {
         return;
       }
@@ -3204,6 +3218,12 @@
 
     function updateTableZoom() {
       if (!refs.tableElement || !refs.tableViewport) {
+        return;
+      }
+      const zoomDisabled = isTableZoomDisabled();
+      setTableZoomDisabledClass(zoomDisabled);
+      if (zoomDisabled) {
+        resetTableZoom();
         return;
       }
       const viewportWidth = refs.tableViewport.clientWidth;
@@ -3224,6 +3244,12 @@
     function scheduleTableZoomUpdate() {
       if (tableZoomAnimationFrameId != null) {
         global.cancelAnimationFrame(tableZoomAnimationFrameId);
+        tableZoomAnimationFrameId = null;
+      }
+      if (isTableZoomDisabled()) {
+        setTableZoomDisabledClass(true);
+        resetTableZoom();
+        return;
       }
       tableZoomAnimationFrameId = global.requestAnimationFrame(function () {
         tableZoomAnimationFrameId = null;
@@ -3705,6 +3731,20 @@
     }
 
     scheduleTableZoomUpdate();
+    if (tableZoomDisableMediaQuery) {
+      const handleTableZoomMediaChange = function () {
+        if (isTableZoomDisabled()) {
+          resetTableZoom();
+        }
+        scheduleTableZoomUpdate();
+      };
+      if (typeof tableZoomDisableMediaQuery.addEventListener === 'function') {
+        tableZoomDisableMediaQuery.addEventListener('change', handleTableZoomMediaChange);
+      } else if (typeof tableZoomDisableMediaQuery.addListener === 'function') {
+        tableZoomDisableMediaQuery.addListener(handleTableZoomMediaChange);
+      }
+      setTableZoomDisabledClass(isTableZoomDisabled());
+    }
     if (typeof global.ResizeObserver === 'function') {
       tableResizeObserver = new global.ResizeObserver(function () {
         scheduleTableZoomUpdate();
