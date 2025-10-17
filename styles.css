@@ -299,7 +299,7 @@ h6 {
   justify-content: flex-end;
 }
 
-@media (max-width: 768px), (orientation: landscape) and (max-height: 480px) {
+@media (max-width: 768px) {
   .sheet-app__toolbar {
     grid-template-columns: auto 1fr;
     grid-template-areas:
@@ -562,7 +562,7 @@ h6 {
   min-width: min(var(--size-320), 100%);
 }
 
-@media (max-width: 768px), (orientation: landscape) and (max-height: 480px) {
+@media (max-width: 768px) {
   .filter-card {
     flex: 1 1 100%;
     min-width: 100%;
@@ -1675,7 +1675,7 @@ h6 {
   border-radius: var(--size-8);
 }
 
-@media (max-width: 900px), (orientation: landscape) and (max-height: 480px) {
+@media (max-width: 900px) {
   .sheet-app {
     padding: var(--size-24) var(--size-16) var(--size-48);
   }
@@ -1695,7 +1695,7 @@ h6 {
   }
 }
 
-@media (max-width: 600px), (orientation: landscape) and (max-height: 480px) {
+@media (max-width: 600px) {
   :root {
     --app-scale: 0.92;
     --font-size-xs: clamp(1rem, 0.98rem + 0.6vw, 1.15rem);
