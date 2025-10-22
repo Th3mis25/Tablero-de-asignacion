@@ -3859,24 +3859,54 @@
         .replace(/\\n/g, '\n');
       csvContent = csvContent.replace(/\n/g, '\r\n');
 
-      if (!doc || !doc.body || !global.Blob || !global.URL || typeof global.URL.createObjectURL !== 'function') {
+      const hasMsSaveBlob =
+        global.navigator && typeof global.navigator.msSaveOrOpenBlob === 'function';
+      const hasObjectUrlSupport =
+        (global.URL && typeof global.URL.createObjectURL === 'function') ||
+        (global.webkitURL && typeof global.webkitURL.createObjectURL === 'function');
+      if (!doc || !doc.body || !global.Blob || (!hasMsSaveBlob && !hasObjectUrlSupport)) {
         setStatus('Esta función no es compatible con tu navegador.', 'error');
         return;
       }
 
       try {
         const blob = new global.Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = global.URL.createObjectURL(blob);
+        const filename = buildDownloadFilename(snapshot);
+
+        if (hasMsSaveBlob) {
+          global.navigator.msSaveOrOpenBlob(blob, filename);
+          showCopyToast('Descarga iniciada.');
+          return;
+        }
+
+        const urlCreator =
+          (global.URL && typeof global.URL.createObjectURL === 'function')
+            ? global.URL
+            : global.webkitURL && typeof global.webkitURL.createObjectURL === 'function'
+              ? global.webkitURL
+              : null;
+        if (!urlCreator) {
+          setStatus('Esta función no es compatible con tu navegador.', 'error');
+          return;
+        }
+
+        const url = urlCreator.createObjectURL(blob);
         const link = doc.createElement('a');
         link.href = url;
-        link.download = buildDownloadFilename(snapshot);
+        link.download = filename;
+        link.rel = 'noopener';
         link.style.display = 'none';
         doc.body.appendChild(link);
         link.click();
         doc.body.removeChild(link);
+
         global.setTimeout(function () {
-          global.URL.revokeObjectURL(url);
-        }, 0);
+          try {
+            urlCreator.revokeObjectURL(url);
+          } catch (err) {
+            // ignore revoke errors
+          }
+        }, 1000);
         showCopyToast('Descarga iniciada.');
       } catch (err) {
         setStatus('Ocurrió un error al preparar la descarga.', 'error');
