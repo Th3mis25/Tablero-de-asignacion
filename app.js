@@ -2108,6 +2108,7 @@
       viewMenu: doc.querySelector('[data-view-menu]'),
       status: doc.querySelector('[data-status]'),
       refreshButton: doc.querySelector('[data-action="refresh"]'),
+      downloadButton: doc.querySelector('[data-action="download-view"]'),
       newRecordButton: doc.querySelector('[data-action="new-record"]'),
       logoutButton: doc.querySelector('[data-action="logout"]'),
       changeTokenButton: doc.querySelector('[data-action="change-token"]'),
@@ -2176,6 +2177,7 @@
       autoRefreshEnabled: initialAutoRefreshEnabled,
       autoRefreshTimer: null,
       lastDataSnapshot: null,
+      lastRenderedSnapshot: null,
       filters: {
         searchText: '',
         dateRange: null,
@@ -3243,6 +3245,7 @@
       }
 
       clearTable();
+      state.lastRenderedSnapshot = null;
 
       if (!Array.isArray(state.data) || state.data.length === 0) {
         updateAvailableStatuses([]);
@@ -3451,6 +3454,25 @@
           return item.entry;
         });
       }
+
+      state.lastRenderedSnapshot = {
+        headers: headers.slice(),
+        columnKeys: columnKeys.slice(),
+        columnCount: columnCount,
+        rows: rowsToRender.map(function (entry) {
+          return {
+            dataIndex: entry.dataIndex,
+            row: Array.isArray(entry.row) ? entry.row.slice() : []
+          };
+        }),
+        viewId: activeView ? activeView.id : '',
+        viewLabel: activeView ? activeView.label : '',
+        filters: {
+          searchText: state.filters.searchText,
+          status: state.filters.status,
+          dateRange: normalizedDateRange
+        }
+      };
 
       const headerRow = doc.createElement('tr');
 
@@ -3702,6 +3724,163 @@
         setStatus('Sincronizado', 'success');
       }
 
+    }
+
+    function getCellExportValue(rawValue, headerLabel, columnKey) {
+      if (rawValue == null || rawValue === '') {
+        return '';
+      }
+      const displayValue = getCellDisplayValue(rawValue);
+      if (displayValue instanceof Date) {
+        return fmtDate(displayValue, state.locale);
+      }
+      if (isDateHeader(headerLabel)) {
+        const formatted = fmtDate(displayValue, state.locale);
+        if (formatted) {
+          return formatted;
+        }
+      }
+      if (columnKey === 'docs') {
+        const docsValue = parseDocsValue(rawValue);
+        if (docsValue === true) {
+          return 'Sí';
+        }
+        if (docsValue === false) {
+          return 'No';
+        }
+      }
+      if (displayValue == null || displayValue === '') {
+        return '';
+      }
+      return String(displayValue);
+    }
+
+    function convertRowsToCsv(rows) {
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return '';
+      }
+      const lines = rows.map(function (row) {
+        const cells = Array.isArray(row) ? row : [];
+        return cells
+          .map(function (cell) {
+            const value = cell == null ? '' : String(cell);
+            if (/[",\r\n]/.test(value)) {
+              return '"' + value.replace(/"/g, '""') + '"';
+            }
+            return value;
+          })
+          .join(',');
+      });
+      return '\ufeff' + lines.join('\n');
+    }
+
+    function sanitizeFilenamePart(value) {
+      if (value == null) {
+        return '';
+      }
+      let text = String(value).trim();
+      if (!text) {
+        return '';
+      }
+      try {
+        text = text.normalize('NFD');
+      } catch (err) {
+        // ignore normalize errors
+      }
+      text = text.replace(/[\u0300-\u036f]/g, '');
+      text = text.replace(/[^a-z0-9]+/gi, '-');
+      text = text.replace(/^-+|-+$/g, '');
+      return text.toLowerCase();
+    }
+
+    function buildDownloadFilename(snapshot) {
+      const parts = ['seguimiento-cargas'];
+      const viewLabel = sanitizeFilenamePart(snapshot && snapshot.viewLabel ? snapshot.viewLabel : snapshot && snapshot.viewId);
+      if (viewLabel) {
+        parts.push(viewLabel);
+      }
+      const now = new Date();
+      const timestamp =
+        now.getFullYear() +
+        pad2(now.getMonth() + 1) +
+        pad2(now.getDate()) +
+        '-' +
+        pad2(now.getHours()) +
+        pad2(now.getMinutes());
+      parts.push(timestamp);
+      return parts.filter(function (part) { return part && part.trim(); }).join('_') + '.csv';
+    }
+
+    function handleDownloadView() {
+      const snapshot = state.lastRenderedSnapshot;
+      if (!snapshot || !snapshot.rows || snapshot.rows.length === 0) {
+        setStatus('No hay registros para descargar en la vista actual.', 'info');
+        return;
+      }
+
+      const columnCount = snapshot.columnCount || 0;
+      if (columnCount === 0) {
+        setStatus('No hay columnas disponibles para la descarga.', 'error');
+        return;
+      }
+
+      const headerRow = [];
+      for (let c = 0; c < columnCount; c++) {
+        const headerLabel = snapshot.headers && c < snapshot.headers.length ? snapshot.headers[c] : null;
+        const label = headerLabel != null && headerLabel !== '' ? headerLabel : columnLetter(c);
+        headerRow.push(String(label));
+      }
+
+      const rows = [headerRow];
+      snapshot.rows.forEach(function (entry) {
+        const row = Array.isArray(entry && entry.row) ? entry.row : [];
+        const values = [];
+        for (let c = 0; c < columnCount; c++) {
+          const headerLabel = snapshot.headers && c < snapshot.headers.length ? snapshot.headers[c] : null;
+          const columnKey = snapshot.columnKeys && c < snapshot.columnKeys.length ? snapshot.columnKeys[c] : null;
+          const rawValue = c < row.length ? row[c] : '';
+          values.push(getCellExportValue(rawValue, headerLabel, columnKey));
+        }
+        rows.push(values);
+      });
+
+      let csvContent = convertRowsToCsv(rows);
+      if (!csvContent) {
+        setStatus('No se pudo generar el archivo para descargar.', 'error');
+        return;
+      }
+
+      if (csvContent.startsWith('\\ufeff')) {
+        csvContent = '\ufeff' + csvContent.slice('\\ufeff'.length);
+      }
+      csvContent = csvContent
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\r/g, '\n')
+        .replace(/\\n/g, '\n');
+      csvContent = csvContent.replace(/\n/g, '\r\n');
+
+      if (!doc || !doc.body || !global.Blob || !global.URL || typeof global.URL.createObjectURL !== 'function') {
+        setStatus('Esta función no es compatible con tu navegador.', 'error');
+        return;
+      }
+
+      try {
+        const blob = new global.Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = global.URL.createObjectURL(blob);
+        const link = doc.createElement('a');
+        link.href = url;
+        link.download = buildDownloadFilename(snapshot);
+        link.style.display = 'none';
+        doc.body.appendChild(link);
+        link.click();
+        doc.body.removeChild(link);
+        global.setTimeout(function () {
+          global.URL.revokeObjectURL(url);
+        }, 0);
+        showCopyToast('Descarga iniciada.');
+      } catch (err) {
+        setStatus('Ocurrió un error al preparar la descarga.', 'error');
+      }
     }
 
     scheduleTableZoomUpdate();
@@ -4407,6 +4586,9 @@
       refs.refreshButton.addEventListener('click', function () {
         loadData();
       });
+    }
+    if (refs.downloadButton) {
+      refs.downloadButton.addEventListener('click', handleDownloadView);
     }
     if (refs.newRecordButton) {
       refs.newRecordButton.addEventListener('click', function () {
